@@ -81,9 +81,25 @@ if [ -f package-lock.json ]; then npm ci; else npm install; fi
 # --- 4) Datenbank: Migrationen + Erst-Admin + optional Demo-Daten -----------
 log "Richte Datenbank ein …"
 npx prisma generate
-npx prisma migrate deploy
+
+# migrate deploy anwenden. Schlägt es fehl (z. B. P3005: bestehende DB ohne
+# Migrationsverlauf aus einem früheren "db push"), kann mit RESET_DB=1 sauber
+# neu aufgesetzt werden – NUR bei einer Installation ohne echte Daten.
+if ! npx prisma migrate deploy; then
+  if [ "${RESET_DB:-0}" = "1" ]; then
+    log "RESET_DB=1: setze Datenbank neu auf (bestehende Daten gehen verloren) …"
+    rm -f prisma/prod.db prisma/prod.db-journal prisma/dev.db prisma/dev.db-journal
+    npx prisma migrate deploy
+    SEED=1
+  else
+    err "Datenbank-Migration fehlgeschlagen (vermutlich P3005: vorhandene DB ohne Migrationsverlauf)."
+    err "Bei einer NEUEN Installation ohne echte Daten erneut ausführen mit  RESET_DB=1"
+    exit 1
+  fi
+fi
+
 if [ "$SEED" = "1" ]; then
-  log "Spiele Stammdaten (Bereiche/Kategorien/Produkte ohne Preise) ein …"
+  log "Spiele Stammdaten (Bereiche/Kategorien/Produkte ohne Preise, Standard-Veranstaltung) ein …"
   npm run db:seed
 fi
 log "Lege/aktualisiere Administrator …"
