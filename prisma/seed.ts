@@ -7,6 +7,20 @@ const prisma = new PrismaClient();
 // ohne Preis ("Preis fehlt") und erhalten ihren Preis ausschließlich im Adminbereich.
 
 async function main() {
+  // Überschreibschutz: sind bereits Daten vorhanden, wird NICHT geseedet
+  // (verhindert versehentliches Löschen). Bewusst erzwingen mit FORCE_SEED=1.
+  const [anzProdukte, anzBestellungen] = await Promise.all([
+    prisma.produkt.count().catch(() => 0),
+    prisma.bestellung.count().catch(() => 0),
+  ]);
+  if ((anzProdukte > 0 || anzBestellungen > 0) && process.env.FORCE_SEED !== "1") {
+    console.error(
+      `Abbruch: Es sind bereits Daten vorhanden (${anzProdukte} Produkte, ${anzBestellungen} Bestellungen).`,
+    );
+    console.error("Der Seed würde diese überschreiben. Zum bewussten Zurücksetzen:  FORCE_SEED=1 npm run db:seed");
+    process.exit(1);
+  }
+
   console.log("Seed: räume bestehende Stammdaten auf …");
   await prisma.bestellPosition.deleteMany();
   await prisma.bestellung.deleteMany();

@@ -85,6 +85,17 @@ if [ -f package-lock.json ]; then npm ci; else npm install; fi
 #  - Alt-DB ohne Verlauf (P3005, aus früherem "db push") -> wird automatisch und
 #    verlustfrei als Baseline übernommen (Schema additiv angleichen + Migrationen markieren)
 log "Richte Datenbank ein …"
+
+# Sicherheitskopie der Datenbank VOR jeder Änderung (Schutz vor Datenverlust).
+for DBF in prisma/prod.db prisma/dev.db; do
+  if [ -f "$DBF" ]; then
+    mkdir -p backups
+    KOPIE="backups/auto-$(basename "$DBF")-$(date +%Y%m%d-%H%M%S).sqlite"
+    cp -a "$DBF" "$KOPIE"
+    log "Backup angelegt: $KOPIE"
+  fi
+done
+
 npx prisma generate
 
 # Optionaler bewusster Neuaufbau (nur ohne echte Daten sinnvoll).
