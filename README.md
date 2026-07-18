@@ -1,187 +1,276 @@
-# POS-Kasse
+# POS-Kasse – Kirchtagsfest
 
-Touch-fähiges Kassensystem als installierbare **Progressive Web App (PWA)**.
-Verwaltet Verkaufsbereiche, Kategorien, Produkte und Preise und bietet eine
-responsive Kassenansicht für Smartphone, Tablet, Notebook, Desktop und
-Touch-Kassenmonitor.
+Touch-fähiges **Kassensystem als installierbare Progressive Web App (PWA)** für ein
+Kirchtagsfest. Verschiedene Bedienpersonen rechnen damit schnell und ohne Vorkenntnisse
+Getränke, Speisen, Kaffee, Kuchen und Spirituosen ab.
 
-Stack: **Next.js 16** (App Router) · **Prisma** (SQLite) · **Tailwind CSS** · TypeScript.
+Die Oberfläche erinnert an eine moderne Registrierkasse: große Produktkacheln,
+gut sichtbare Summen, automatische Rückgeldberechnung, Bedienung per Fingertipp.
+
+- **Kasse:** `/kasse`
+- **Administration (geschützt):** `/admin`
 
 ---
 
-## Installation auf dem Server (One-Liner)
+## Inhalt
 
-Komplette Installation auf einem Linux-Server (Node wird bei Bedarf mitinstalliert,
-Datenbank eingerichtet, App gebaut und als systemd-Dienst gestartet):
+- [Verwendete Technologien](#verwendete-technologien)
+- [Projektstruktur](#projektstruktur)
+- [Systemvoraussetzungen](#systemvoraussetzungen)
+- [Installation unter Ubuntu (One-Liner)](#installation-unter-ubuntu-one-liner)
+- [Manuelle Installation / Entwicklung](#manuelle-installation--entwicklung)
+- [Konfiguration & Umgebungsvariablen](#konfiguration--umgebungsvariablen)
+- [Ersten Administrator anlegen](#ersten-administrator-anlegen)
+- [Start / Stopp](#start--stopp)
+- [Tests ausführen](#tests-ausführen)
+- [Bedienung](#bedienung)
+- [Preisverwaltung & „Preis fehlt“](#preisverwaltung--preis-fehlt)
+- [PWA installieren](#pwa-installieren)
+- [Offline- und Verbindungsverhalten](#offline--und-verbindungsverhalten)
+- [Backup & Wiederherstellung](#backup--wiederherstellung)
+- [Programm aktualisieren](#programm-aktualisieren)
+- [Typische Fehler und Lösungen](#typische-fehler-und-lösungen)
+
+---
+
+## Verwendete Technologien
+
+Der Stack orientiert sich am Referenzprojekt **IKTMT-MTGNX** (das trotz generischer
+„Java“-Formulierungen in der Aufgabenstellung tatsächlich ein Next.js/TypeScript-Projekt ist):
+
+| Bereich | Technologie |
+| --- | --- |
+| Laufzeit | Node.js 20+ (Ubuntu) |
+| Framework | Next.js 16 (App Router, React 18) |
+| Sprache | TypeScript |
+| Datenbank | SQLite (via Prisma; für Skalierung auf PostgreSQL umstellbar) |
+| Datenzugriff / Migrationen | Prisma ORM + Prisma Migrate |
+| Styling | Tailwind CSS |
+| Auth | JWT-Session (jose, HS256) im httpOnly-Cookie, scrypt-Passworthashes |
+| Validierung | Zod |
+| Tests | Vitest |
+| Betrieb | systemd-Dienst, optional nginx (HTTPS) |
+
+**Geldbeträge** werden durchgängig als **Integer in Cent** verarbeitet: exakt, zwei
+Nachkommastellen, niemals `float`/`double` – das technische Äquivalent zu `BigDecimal`/`DECIMAL`.
+
+## Projektstruktur
+
+```
+prisma/schema.prisma            Datenmodell (Cent-Beträge, preisCent NULL = "Preis fehlt")
+prisma/migrations/              Prisma-Migrationen
+prisma/seed.ts                  Stammdaten: Bereiche, Kategorien, 47 Produkte OHNE Preise
+scripts/create-admin.ts         Erst-Admin anlegen / Passwort zurücksetzen (aus ENV)
+scripts/backup.sh, restore.sh   Datensicherung / Wiederherstellung
+scripts/gen-icons.mjs           PWA-Icons erzeugen
+install.sh                      Komplette Server-Installation (idempotent)
+deploy/nginx-kassa.conf         Beispiel-HTTPS-Reverse-Proxy
+src/lib/sichtbarkeit.ts         Einzige Wahrheit der Produkt-Sichtbarkeitsregel
+src/lib/money.ts                Geld-Helfer (Cent <-> EUR, Preisgültigkeit)
+src/lib/session.ts / auth.ts    JWT-Session (Edge-Kern) / Server-Auth-Helfer
+src/middleware.ts               Schutz von /admin und /api/admin
+src/app/api/kasse/*             Kassen-API (Bereiche, sichtbare Produkte, Einzelprodukt)
+src/app/api/bestellungen/*      Bestellung anlegen (transaktionssicher, idempotent)
+src/app/api/admin/*             Verwaltung, Auswertungen, Status, Upload, Storno
+src/app/kasse, src/app/admin    Kassen- und Verwaltungsoberfläche
+public/manifest.webmanifest     PWA-Manifest
+public/sw.js                    Service Worker
+```
+
+## Systemvoraussetzungen
+
+- Ubuntu (oder anderes Linux); Windows/macOS für Entwicklung
+- **Node.js 20+** und npm
+- Für den Produktivbetrieb: **HTTPS** (PWA/Service Worker), z. B. via nginx + Let's Encrypt
+
+## Installation unter Ubuntu (One-Liner)
+
+Komplette Installation (Node bei Bedarf, Datenbank, Build, systemd-Dienst, Erst-Admin):
 
 ```bash
 sudo -H bash -c 'DIR=/opt/kassa PORT=3000 SEED=1 bash <(curl -fsSL https://raw.githubusercontent.com/hwutti/Kassa/main/install.sh)'
 ```
 
-Danach läuft die Kasse unter `http://SERVER:3000/kasse`. Der Aufruf ist **idempotent** –
-erneut ausgeführt aktualisiert er die Installation (Code neu holen, bauen, Dienst neu starten).
+Danach läuft die Kasse unter `http://SERVER:3000/kasse`. Das Skript ist **idempotent**
+(erneut ausführen = Update). Beim ersten Lauf wird ein zufälliges Admin-Passwort erzeugt
+und **im Log ausgegeben** – bitte notieren. Alternativ vorab `ADMIN_PASSWORT=…` setzen.
 
 | Variable | Zweck | Standard |
 | --- | --- | --- |
 | `DIR` | Zielverzeichnis | `/opt/kassa` |
 | `PORT` | HTTP-Port | `3000` |
-| `SEED` | Demo-Daten einspielen (`1`/`0`) | `0` |
+| `SEED` | Stammdaten einspielen (`1`/`0`) | `0` |
+| `ADMIN_PASSWORT` | Admin-Passwort vorgeben | (zufällig erzeugt) |
 | `BRANCH` | Git-Branch | `main` |
-
-Nur aktualisieren (ohne Demo-Daten):
-
-```bash
-sudo -H bash -c 'DIR=/opt/kassa bash <(curl -fsSL https://raw.githubusercontent.com/hwutti/Kassa/main/install.sh)'
-```
 
 Dienst verwalten: `systemctl status|restart|stop kassa` · Logs: `journalctl -u kassa -f`
 
-> Für den produktiven PWA-Betrieb (Installierbarkeit, Service Worker) ist **HTTPS** erforderlich –
-> üblicherweise über einen Reverse-Proxy (nginx/Caddy) vor dem Port.
-
----
-
-## Schnellstart (Entwicklung)
+## Manuelle Installation / Entwicklung
 
 ```bash
+git clone https://github.com/hwutti/Kassa.git && cd Kassa
 npm install
-cp .env.example .env          # DATABASE_URL="file:./dev.db"
-npm run db:push               # Datenbankschema anlegen
-npm run db:seed               # Demo-Daten (inkl. Testfälle "Preis fehlt" etc.)
-npm run gen:icons             # PWA-Icons erzeugen (liegen bereits bei)
-npm run dev                   # http://localhost:3000
+cp .env.example .env            # Werte anpassen (siehe unten)
+npm run db:migrate:dev          # Datenbank + Migrationen
+npm run db:seed                 # Stammdaten (Produkte ohne Preise)
+npm run admin:create            # Admin aus .env anlegen
+npm run dev                     # http://localhost:3000
 ```
 
-- **Kasse:** `/kasse`
-- **Verwaltung:** `/admin`
+## Konfiguration & Umgebungsvariablen
 
-### Nützliche Skripte
+Alle Geheimnisse liegen in `.env` (nicht im Repository). Vorlage: `.env.example`.
 
-| Befehl | Zweck |
+| Variable | Bedeutung |
 | --- | --- |
-| `npm run dev` | Entwicklungsserver |
-| `npm run build && npm start` | Produktionsbuild + Start |
-| `npm run typecheck` | TypeScript prüfen |
-| `npm run test` | Unit-Tests (Vitest) |
-| `npm run db:studio` | Prisma Studio |
-| `npm run db:reset` | DB zurücksetzen + neu seeden |
+| `DATABASE_URL` | Datenbank, z. B. `file:./prod.db` (SQLite) |
+| `AUTH_SECRET` | Signaturschlüssel der Admin-Session (langer Zufallswert!) |
+| `ADMIN_BENUTZER` | Benutzername des Erst-Admins (Standard `admin`) |
+| `ADMIN_PASSWORT` | Passwort des Erst-Admins (nur für `admin:create`/Seed) |
 
----
+Zufallswert erzeugen: `openssl rand -base64 48`
 
-## Kernregel: Sichtbarkeit von Produkten
+## Ersten Administrator anlegen
 
-Ein Produkt erscheint in der **Kassenansicht** nur, wenn **alle** Bedingungen erfüllt sind:
+```bash
+ADMIN_BENUTZER="admin" ADMIN_PASSWORT="sicheres-passwort" npm run admin:create
+```
 
-1. Produkt ist **aktiv**,
-2. zugehörige **Kategorie ist aktiv**,
-3. gewählter **Verkaufsbereich ist aktiv**,
-4. Produkt ist dem Verkaufsbereich **zugeordnet**,
-5. ein **gültiger Preis** ist hinterlegt (nicht leer).
+Idempotent: erneut ausgeführt setzt es das Passwort zurück. Passwörter werden als
+scrypt-Hash gespeichert – niemals im Klartext.
 
-Diese Regel ist an genau einer Stelle definiert: [`src/lib/sichtbarkeit.ts`](src/lib/sichtbarkeit.ts).
-Sie wird für Liste, **Suche**, **Direkt-URL-Abruf** (`/api/kasse/produkt/[id]`) und die
-**Bestell-Validierung** verwendet. Produkte ohne gültigen Preis sind daher:
+## Start / Stopp
 
-- nicht als Kachel sichtbar,
-- nicht suchbar,
-- nicht per Direkt-URL abrufbar (HTTP 404),
-- nicht zu einer Bestellung hinzufügbar (HTTP 409, serverseitig erneut geprüft).
+**Entwicklung:** `npm run dev` (Start), `Strg+C` (Stopp).
 
-Im **Administrationsbereich** bleiben sie sichtbar und sind deutlich mit
-**„Preis fehlt"** gekennzeichnet. Sobald ein gültiger Preis gespeichert wird,
-erscheint das Produkt (bei Erfüllung der übrigen Bedingungen) in der Kasse.
-Wird der Preis entfernt, verschwindet es dort wieder. **Bereits abgeschlossene
-Bestellungen bleiben unverändert.**
+**Produktion (Build + Start):**
+```bash
+npm run build
+npm run start -- -p 3000
+```
 
-> Geldbeträge werden intern durchgängig als **Integer in Cent** gespeichert –
-> keine Fließkomma-Rundungsfehler. Ein fehlender Preis ist `NULL`.
+**Als systemd-Dienst (vom Installer eingerichtet):**
+```bash
+systemctl start kassa      # starten
+systemctl stop kassa       # stoppen
+systemctl restart kassa    # neu starten
+systemctl status kassa     # Status
+```
+Der Dienst startet nach einem Serverneustart automatisch.
 
----
+## Tests ausführen
 
-## Responsive Bedienung
+```bash
+npm run test        # einmalig
+npm run test:watch  # im Watch-Modus
+npm run typecheck   # TypeScript-Prüfung
+```
 
-- **Smartphone:** Bereich/Kategorie oben, 1–2-spaltige Kacheln, fixierte
-  „Bestellung"-Leiste mit jederzeit sichtbarer Gesamtsumme, Bestellung als Bottom-Sheet.
-- **Tablet/Desktop/Kasse:** Produktübersicht plus dauerhaft sichtbare Bestell-Sidebar
-  mit Gesamtsumme, Geldeingabe und Rückgeld.
-- Hoch- und Querformat werden unterstützt, kein horizontales Scrollen.
-- **Touch:** große Klickflächen, ausreichend Abstand, keine Hover-/Rechtsklick-Zwänge,
-  On-Screen-Ziffernblock und numerische Bildschirmtastatur (`inputMode`) für die Geldeingabe,
-  Schutz vor doppeltem Auslösen (Button gesperrt während des Speicherns + Idempotenzschlüssel).
+## Bedienung
 
----
+**Kasse** (`/kasse`): Verkaufsbereich oben wählen → Kategorie → Produkt antippen
+(jeder weitere Tipp erhöht die Menge; zusätzlich Plus/Minus). Gesamtsumme wird
+automatisch berechnet, erhaltenes Bargeld eingeben → Rückgeld erscheint →
+**Kassieren**. Danach beginnt automatisch eine neue Bestellung.
 
-## PWA – Installation
+**Administration** (`/admin`, Login erforderlich):
+- **Produkte:** anlegen, bearbeiten, Preis pflegen, Kategorie/Verkaufsbereiche zuordnen, Bild/Icon, sortieren, nach „Preis fehlt“ filtern.
+- **Kategorien / Verkaufsbereiche:** anlegen, bearbeiten, aktiv/inaktiv, sortieren, Icon.
+- **Preisübersicht:** alle Preise, fehlende Preise, letzte Änderung.
+- **Bestellungen:** einsehen und (mit Grund) stornieren.
+- **Auswertungen:** Umsätze je Bereich/Kategorie/Produkt, Tagesumsatz, Storni.
+- **Übersicht:** Kassenbereitschaft (verkaufbare Produkte, fehlende Preise …).
 
-Die App ist installierbar (gültiges Manifest, Service Worker, Icons, `display: standalone`).
+## Preisverwaltung & „Preis fehlt“
+
+Verkaufspreise werden **ausschließlich im Administrationsbereich** eingegeben – nie im
+Code oder in Seed-Daten. Ein Produkt erscheint in der Kasse nur, wenn **alle** Bedingungen
+erfüllt sind: Produkt aktiv, Kategorie aktiv, Verkaufsbereich aktiv, Produkt dem Bereich
+zugeordnet, **gültiger Preis** hinterlegt. (Ausnahme: die **Allgemeine Kassa** zeigt alle
+gültigen, aktiven Produkte.)
+
+Produkte ohne gültigen Preis sind in der Kasse **vollständig unsichtbar** – nicht als
+Kachel, nicht suchbar, nicht per Direkt-URL (404), nicht über die API bestellbar (409,
+serverseitig geprüft). Im Admin sind sie sichtbar und mit **„Preis fehlt“** markiert.
+Wird ein Preis gesetzt, erscheint das Produkt sofort; wird er entfernt, verschwindet es
+wieder. **Abgeschlossene Bestellungen bleiben unverändert**, und eine **laufende
+Bestellung behält den beim Hinzufügen gültigen Preis**.
+
+## PWA installieren
 
 ### Android (Chrome)
-1. Seite im Chrome öffnen.
-2. Menü **⋮ → „App installieren"** bzw. **„Zum Startbildschirm hinzufügen"**.
-3. Bestätigen – die App erscheint im App-Drawer und startet ohne Browser-Leiste.
+Seite öffnen → Menü **⋮ → „App installieren“** / „Zum Startbildschirm hinzufügen“ → bestätigen.
 
 ### iPhone / iPad (Safari)
-1. Seite in **Safari** öffnen (nicht Chrome – Installation läuft unter iOS nur über Safari).
-2. **Teilen-Symbol** (Quadrat mit Pfeil) antippen.
-3. **„Zum Home-Bildschirm"** wählen, Namen bestätigen.
-4. Die App startet als eigenständiges Symbol im Standalone-Modus.
+Seite in **Safari** öffnen → **Teilen-Symbol** → **„Zum Home-Bildschirm“** → bestätigen.
+(Unter iOS funktioniert die Installation nur über Safari.)
 
 ### Desktop (Chrome/Edge)
-1. Seite öffnen.
-2. Installations-Symbol in der Adressleiste (Monitor mit Pfeil) **oder**
-   **⋮ → „… installieren"**.
-3. Die App öffnet sich in einem eigenen Fenster.
+Installations-Symbol in der Adressleiste **oder** Menü **⋮ → „… installieren“**.
 
 ### Aktualisierung der installierten App
-- Der Service Worker sucht beim Öffnen/Fokussieren nach einer neuen Version.
-- Ist eine neue Version verfügbar, erscheint unten der Hinweis **„Eine neue Version ist verfügbar"**.
-- Die neue Version wird **erst nach bewusstem Klick** auf „Jetzt aktualisieren" aktiv.
-- Ist gerade eine **Bestellung offen**, wird die Aktualisierung blockiert, bis die
-  Bestellung abgeschlossen oder verworfen wurde – so geht keine laufende Bestellung verloren.
+Bei neuer Version erscheint unten der Hinweis **„Eine neue Version ist verfügbar“**.
+Die Aktualisierung wird **erst nach Klick** auf „Jetzt aktualisieren“ aktiv – und ist
+**blockiert, solange eine Bestellung offen ist**, damit nichts verloren geht.
 
----
+### PWA entfernen
+- **Android:** Icon lange drücken → „Deinstallieren“ / „App-Info → Deinstallieren“.
+- **iPhone/iPad:** Icon lange drücken → „App entfernen“ → „Vom Home-Bildschirm entfernen“.
+- **Desktop (Chrome/Edge):** App öffnen → Menü **⋮ → „… deinstallieren“**.
 
 ## Offline- und Verbindungsverhalten
 
-- **Statische Ressourcen** (App-Shell, CSS, JS, Icons) werden vom Service Worker
-  zwischengespeichert – die App bleibt offline lesbar.
-- **Produkt- und Preisdaten** (`/api/*`) werden **nie** gecacht (network-only). So kann
-  keine veraltete Preisliste unbemerkt für neue Verkäufe verwendet werden.
-- Der **Verbindungsstatus** wird deutlich angezeigt (Badge „Online/Offline" +
-  roter Banner bei fehlender Verbindung); geprüft über `navigator.onLine` **und**
-  einen `/api/health`-Ping (Server + Datenbank).
+- Statische Ressourcen (App-Shell, CSS, JS, Icons, Produktbilder) werden vom Service
+  Worker gecacht – die App bleibt offline lesbar.
+- **Produkt- und Preisdaten (`/api/*`) werden nie gecacht** (network-only). Eine veraltete
+  Preisliste kann daher nicht unbemerkt für Verkäufe verwendet werden.
+- Der **Verbindungsstatus** wird deutlich angezeigt (Badge + roter Banner); geprüft über
+  `navigator.onLine` **und** einen `/api/health`-Ping (Server + Datenbank).
 - Bei fehlender Verbindung ist der **Bestellabschluss gesperrt**. Eine Bestellung gilt
-  **erst nach sicherem Speichern** (HTTP 2xx) als abgeschlossen – vorher wird kein Erfolg angezeigt.
-- **Kein Verkauf geht verloren oder wird doppelt gespeichert:** jede Bestellung trägt einen
-  **Idempotenzschlüssel** (`clientRef`, `UNIQUE`); Wiederholungen liefern dieselbe Bestellung.
-  Bestellnummern werden **transaktionssicher** über einen Zähler vergeben.
+  **erst nach sicherem Speichern** als abgeschlossen.
+- **Kein doppelter/verlorener Verkauf:** Idempotenzschlüssel (`clientRef`, `UNIQUE`),
+  transaktionssichere Bestellnummern, gesperrte Abschluss-Schaltfläche während des Speicherns.
+- Eine **offene Bestellung übersteht ein versehentliches Neuladen** (lokale Zwischenspeicherung).
 
-> Ein vollständiger Offline-Verkaufsmodus ist bewusst **nicht** umgesetzt: Bei fehlender
-> Verbindung bleibt die App lesbar, sperrt aber neue Abschlüsse (transaktionssicher statt riskant).
+## Backup & Wiederherstellung
+
+**Sichern** (Datenbank + Produktbilder):
+```bash
+bash scripts/backup.sh /pfad/zu/backups
+```
+Empfohlen als tägliche Aufgabe (cron), z. B.:
+```
+0 2 * * *  cd /opt/kassa && bash scripts/backup.sh /var/backups/kassa
+```
+
+**Wiederherstellen:**
+```bash
+bash scripts/restore.sh /var/backups/kassa/db-YYYYMMDD-HHMMSS.sqlite \
+                        /var/backups/kassa/uploads-YYYYMMDD-HHMMSS.tar.gz
+systemctl restart kassa
+```
+
+## Programm aktualisieren
+
+Denselben One-Liner erneut ausführen (ohne `SEED=1`, damit keine Stammdaten überschrieben
+werden):
+```bash
+sudo -H bash -c 'DIR=/opt/kassa bash <(curl -fsSL https://raw.githubusercontent.com/hwutti/Kassa/main/install.sh)'
+```
+Der Installer holt den Code, wendet neue Migrationen an, baut neu und startet den Dienst.
+
+## Typische Fehler und Lösungen
+
+| Problem | Ursache / Lösung |
+| --- | --- |
+| Kasse zeigt keine Produkte | Produkte haben noch **keinen Preis** → im Admin unter „Produkte“ pflegen (Filter „Preis fehlt“). |
+| „Keine Verbindung“ im roten Banner | Server/DB nicht erreichbar → Dienst/Netzwerk prüfen (`journalctl -u kassa -f`). Abschluss ist bis dahin gesperrt. |
+| Admin-Login schlägt fehl | Passwort mit `npm run admin:create` (ENV `ADMIN_PASSWORT`) zurücksetzen. |
+| PWA lässt sich nicht installieren | **HTTPS** fehlt → nginx + Zertifikat einrichten (siehe `deploy/nginx-kassa.conf`). |
+| Bild-Upload abgelehnt | Nur PNG/JPG/WebP bis 2 MB; SVG ist aus Sicherheitsgründen nicht erlaubt. |
+| Preisänderung nicht sichtbar | Neue Bestellungen verwenden den neuen Preis; eine bereits laufende Bestellung behält bewusst ihren Preis. |
+| `AUTH_SECRET fehlt` | In `.env` einen langen Zufallswert setzen (`openssl rand -base64 48`). |
 
 ---
 
-## Projektstruktur
-
-```
-prisma/schema.prisma            Datenmodell (Beträge in Cent, preisCent NULL = "Preis fehlt")
-prisma/seed.ts                  Demo-Daten inkl. Testfälle
-src/lib/sichtbarkeit.ts         Einzige Wahrheit der Sichtbarkeitsregel
-src/lib/money.ts                Geld-Helfer (Cent <-> EUR, Preisgültigkeit)
-src/app/api/kasse/*             Kassen-API (Bereiche, sichtbare Produkte, Einzelprodukt)
-src/app/api/bestellungen/*      Bestellung anlegen (transaktionssicher, idempotent)
-src/app/api/admin/*             Verwaltung (Produkte, Kategorien, Verkaufsbereiche)
-src/components/kasse/*          Kassenansicht (Warenkorb, Geldrechner, Beleg)
-src/components/admin/*          Verwaltungs-UI
-src/components/PwaController.tsx SW-Registrierung, Verbindungs-/Update-Hinweise
-public/manifest.webmanifest     PWA-Manifest
-public/sw.js                    Service Worker
-```
-
----
-
-## Produktivbetrieb
-
-- **HTTPS ist erforderlich**, damit Service Worker/Installation funktionieren.
-- Für Mehrbenutzerbetrieb empfiehlt sich ein Wechsel des Prisma-Providers von SQLite
-  auf **PostgreSQL** (`DATABASE_URL` anpassen, `prisma migrate deploy`).
+Repository: <https://github.com/hwutti/Kassa>

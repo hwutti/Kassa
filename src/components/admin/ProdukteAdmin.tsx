@@ -9,6 +9,7 @@ type Produkt = {
   name: string;
   beschreibung: string | null;
   icon: string | null;
+  bildUrl: string | null;
   preisCent: number | null;
   preisFehlt: boolean;
   aktiv: boolean;
@@ -24,6 +25,7 @@ type FormState = {
   name: string;
   beschreibung: string;
   icon: string;
+  bildUrl: string | null;
   preisText: string; // leer = Preis fehlt
   sortierung: number;
   aktiv: boolean;
@@ -35,6 +37,7 @@ const LEER: FormState = {
   name: "",
   beschreibung: "",
   icon: "",
+  bildUrl: null,
   preisText: "",
   sortierung: 0,
   aktiv: true,
@@ -82,6 +85,7 @@ export function ProdukteAdmin() {
       name: p.name,
       beschreibung: p.beschreibung ?? "",
       icon: p.icon ?? "",
+      bildUrl: p.bildUrl,
       preisText: p.preisCent === null ? "" : (p.preisCent / 100).toFixed(2).replace(".", ","),
       sortierung: p.sortierung,
       aktiv: p.aktiv,
@@ -106,6 +110,7 @@ export function ProdukteAdmin() {
       name: form.name.trim(),
       beschreibung: form.beschreibung.trim() || null,
       icon: form.icon.trim() || null,
+      bildUrl: form.bildUrl,
       preisCent,
       sortierung: form.sortierung,
       aktiv: form.aktiv,
@@ -168,7 +173,16 @@ export function ProdukteAdmin() {
         <div className="space-y-2">
           {sichtbareProdukte.map((p) => (
             <div key={p.id} className="card p-3 flex items-center gap-3">
-              <span className="text-2xl w-8 text-center shrink-0">{p.icon || "📦"}</span>
+              {p.bildUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={p.bildUrl}
+                  alt=""
+                  className="h-9 w-9 rounded object-cover shrink-0 bg-neutral-800"
+                />
+              ) : (
+                <span className="text-2xl w-9 text-center shrink-0">{p.icon || "📦"}</span>
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium">{p.name}</span>
@@ -236,6 +250,9 @@ function ProduktForm({
   onSpeichern: () => void;
   onAbbrechen: () => void;
 }) {
+  const [ladeBild, setLadeBild] = useState(false);
+  const [bildFehler, setBildFehler] = useState<string | null>(null);
+
   function toggleBereich(id: string) {
     const drin = form.verkaufsbereichIds.includes(id);
     setForm({
@@ -244,6 +261,23 @@ function ProduktForm({
         ? form.verkaufsbereichIds.filter((x) => x !== id)
         : [...form.verkaufsbereichIds, id],
     });
+  }
+
+  async function bildHochladen(datei: File) {
+    setLadeBild(true);
+    setBildFehler(null);
+    try {
+      const fd = new FormData();
+      fd.append("datei", datei);
+      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const info = await res.json();
+      if (!res.ok) throw new Error(info.error ?? "Upload fehlgeschlagen.");
+      setForm({ ...form, bildUrl: info.url });
+    } catch (e) {
+      setBildFehler((e as Error).message);
+    } finally {
+      setLadeBild(false);
+    }
   }
 
   return (
@@ -281,6 +315,43 @@ function ProduktForm({
             onChange={(e) => setForm({ ...form, beschreibung: e.target.value })}
           />
         </label>
+
+        {/* Produktbild (optional) – PNG/JPG/WebP, max. 2 MB */}
+        <div>
+          <span className="text-sm text-neutral-400">Bild (optional, PNG/JPG/WebP)</span>
+          <div className="mt-1 flex items-center gap-3">
+            {form.bildUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={form.bildUrl} alt="" className="h-14 w-14 rounded object-cover bg-neutral-800" />
+            ) : (
+              <span className="h-14 w-14 rounded bg-neutral-800 flex items-center justify-center text-2xl">
+                {form.icon || "📦"}
+              </span>
+            )}
+            <div className="flex flex-col gap-1">
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="text-sm text-neutral-300 file:mr-2 file:rounded-lg file:border-0 file:bg-neutral-700 file:px-3 file:py-1.5 file:text-neutral-100"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) bildHochladen(f);
+                }}
+              />
+              {form.bildUrl && (
+                <button
+                  type="button"
+                  className="text-xs text-red-300 text-left"
+                  onClick={() => setForm({ ...form, bildUrl: null })}
+                >
+                  Bild entfernen
+                </button>
+              )}
+            </div>
+          </div>
+          {ladeBild && <p className="text-xs text-neutral-400 mt-1">Lädt Bild hoch …</p>}
+          {bildFehler && <p className="text-xs text-red-300 mt-1">{bildFehler}</p>}
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">

@@ -42,6 +42,7 @@ const CreateSchema = z.object({
   name: z.string().trim().min(1).max(150),
   beschreibung: z.string().trim().max(500).nullable().optional(),
   icon: z.string().trim().max(40).nullable().optional(),
+  bildUrl: z.string().trim().max(300).nullable().optional(),
   // preisCent null erlaubt = "Preis fehlt".
   preisCent: z.number().int().min(0).nullable().optional(),
   aktiv: z.boolean().optional(),
@@ -60,6 +61,7 @@ export async function POST(req: Request) {
         name: daten.name,
         beschreibung: daten.beschreibung ?? null,
         icon: daten.icon ?? null,
+        bildUrl: daten.bildUrl ?? null,
         preisCent: daten.preisCent ?? null,
         preisGeaendertAm: hatPreis ? new Date() : null,
         aktiv: daten.aktiv ?? true,

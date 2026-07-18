@@ -54,23 +54,40 @@ fi
 cd "$DIR"
 
 # --- 2) Umgebungsdatei (.env) ----------------------------------------------
-if [ ! -f .env ]; then
-  log "Lege .env an (SQLite-Datenbank prod.db) …"
-  echo 'DATABASE_URL="file:./prod.db"' > .env
+touch .env
+if ! grep -q "^DATABASE_URL=" .env; then
+  echo 'DATABASE_URL="file:./prod.db"' >> .env
 fi
+# AUTH_SECRET bei Bedarf sicher erzeugen (für die Admin-Session).
+if ! grep -q "^AUTH_SECRET=" .env; then
+  SECRET="$(openssl rand -base64 48 2>/dev/null || head -c 48 /dev/urandom | base64)"
+  echo "AUTH_SECRET=\"$SECRET\"" >> .env
+  log "AUTH_SECRET erzeugt."
+fi
+# Admin-Zugang: aus ENV übernehmen oder einmalig sicher erzeugen und ausgeben.
+if ! grep -q "^ADMIN_PASSWORT=" .env; then
+  ADMIN_PW="${ADMIN_PASSWORT:-$(openssl rand -base64 12 2>/dev/null || head -c 9 /dev/urandom | base64)}"
+  echo "ADMIN_BENUTZER=\"${ADMIN_BENUTZER:-admin}\"" >> .env
+  echo "ADMIN_PASSWORT=\"$ADMIN_PW\"" >> .env
+  log "Admin-Zugang: Benutzer '${ADMIN_BENUTZER:-admin}', Passwort: $ADMIN_PW  (bitte notieren und nach dem ersten Login ändern)"
+fi
+# .env für die folgenden Node-Aufrufe laden.
+set -a; . ./.env; set +a
 
 # --- 3) Abhängigkeiten ------------------------------------------------------
 log "Installiere Abhängigkeiten …"
 if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-# --- 4) Datenbank: Schema + optional Demo-Daten ----------------------------
+# --- 4) Datenbank: Migrationen + Erst-Admin + optional Demo-Daten -----------
 log "Richte Datenbank ein …"
 npx prisma generate
-npx prisma db push --accept-data-loss
+npx prisma migrate deploy
 if [ "$SEED" = "1" ]; then
-  log "Spiele Demo-Daten ein …"
+  log "Spiele Stammdaten (Bereiche/Kategorien/Produkte ohne Preise) ein …"
   npm run db:seed
 fi
+log "Lege/aktualisiere Administrator …"
+npm run admin:create
 
 # --- 5) Build ---------------------------------------------------------------
 log "Baue Anwendung …"

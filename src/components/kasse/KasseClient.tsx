@@ -15,6 +15,7 @@ import { Geldrechner } from "@/components/kasse/Geldrechner";
 import { parseEuroToCent } from "@/lib/money";
 
 const BEREICH_KEY = "pos-kasse:verkaufsbereich";
+const OFFENE_BESTELLUNG_KEY = "pos-kasse:offeneBestellung";
 
 type BelegDTO = {
   nummer: number;
@@ -122,6 +123,40 @@ export function KasseClient() {
   useEffect(() => {
     setBestellungOffen(Object.keys(warenkorb).length > 0);
   }, [warenkorb]);
+
+  // Offene Bestellung wiederherstellen (übersteht versehentliches Neuladen / PWA-Update, §23).
+  const wiederhergestellt = useRef(false);
+  useEffect(() => {
+    if (wiederhergestellt.current) return;
+    wiederhergestellt.current = true;
+    try {
+      const raw = window.localStorage.getItem(OFFENE_BESTELLUNG_KEY);
+      if (raw) {
+        const d = JSON.parse(raw) as { warenkorb?: Warenkorb; erhaltenText?: string };
+        if (d.warenkorb && Object.keys(d.warenkorb).length > 0) setWarenkorb(d.warenkorb);
+        if (typeof d.erhaltenText === "string") setErhaltenText(d.erhaltenText);
+      }
+    } catch {
+      /* ignorieren */
+    }
+  }, []);
+
+  // Offene Bestellung laufend sichern; nach Abschluss/Leeren wieder entfernen.
+  useEffect(() => {
+    if (!wiederhergestellt.current) return;
+    try {
+      if (Object.keys(warenkorb).length === 0) {
+        window.localStorage.removeItem(OFFENE_BESTELLUNG_KEY);
+      } else {
+        window.localStorage.setItem(
+          OFFENE_BESTELLUNG_KEY,
+          JSON.stringify({ warenkorb, erhaltenText }),
+        );
+      }
+    } catch {
+      /* ignorieren */
+    }
+  }, [warenkorb, erhaltenText]);
 
   // --- Warenkorb-Operationen ---
   function hinzufuegen(p: ProduktDTO) {
@@ -473,7 +508,16 @@ function ProduktKachel({
         </span>
       )}
       <div className="flex items-start gap-2">
-        {produkt.icon && <span className="text-2xl leading-none shrink-0">{produkt.icon}</span>}
+        {produkt.bildUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={produkt.bildUrl}
+            alt=""
+            className="h-8 w-8 rounded object-cover shrink-0 bg-neutral-800"
+          />
+        ) : produkt.icon ? (
+          <span className="text-2xl leading-none shrink-0">{produkt.icon}</span>
+        ) : null}
         <span className="font-medium leading-tight pr-6">{produkt.name}</span>
       </div>
       <span className="mt-2 text-lg font-semibold tabular-nums text-brand-50">

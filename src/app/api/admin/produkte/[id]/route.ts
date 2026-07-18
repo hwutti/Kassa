@@ -9,6 +9,7 @@ const UpdateSchema = z.object({
   name: z.string().trim().min(1).max(150).optional(),
   beschreibung: z.string().trim().max(500).nullable().optional(),
   icon: z.string().trim().max(40).nullable().optional(),
+  bildUrl: z.string().trim().max(300).nullable().optional(),
   // preisCent: null => Preis entfernen ("Preis fehlt" -> verschwindet aus der Kasse).
   preisCent: z.number().int().min(0).nullable().optional(),
   aktiv: z.boolean().optional(),
@@ -35,6 +36,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (daten.name !== undefined) data.name = daten.name;
     if (daten.beschreibung !== undefined) data.beschreibung = daten.beschreibung;
     if (daten.icon !== undefined) data.icon = daten.icon;
+    if (daten.bildUrl !== undefined) data.bildUrl = daten.bildUrl;
     if (daten.aktiv !== undefined) data.aktiv = daten.aktiv;
     if (daten.archiviert !== undefined) data.archiviert = daten.archiviert;
     if (daten.sortierung !== undefined) data.sortierung = daten.sortierung;
