@@ -101,7 +101,15 @@ export function BenutzerAdmin() {
       <div className="card p-3 flex flex-wrap items-end gap-2">
         <label className="block flex-1 min-w-[10rem]">
           <span className="text-xs text-neutral-400">Benutzername</span>
-          <input className="input mt-1" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
+          <input
+            className="input mt-1"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+          />
         </label>
         <label className="block flex-1 min-w-[10rem]">
           <span className="text-xs text-neutral-400">Passwort</span>

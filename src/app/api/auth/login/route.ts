@@ -16,9 +16,14 @@ const LoginSchema = z.object({
 export async function POST(req: Request) {
   try {
     const daten = LoginSchema.parse(await req.json());
-    const benutzer = await prisma.benutzer.findUnique({
-      where: { benutzername: daten.benutzername },
-    });
+    // Benutzername groß-/kleinschreibungsunabhängig vergleichen (Tablets schreiben oft groß).
+    const eingabe = daten.benutzername.trim();
+    let benutzer = await prisma.benutzer.findUnique({ where: { benutzername: eingabe } });
+    if (!benutzer) {
+      const kandidaten = await prisma.benutzer.findMany();
+      const gesucht = eingabe.toLowerCase();
+      benutzer = kandidaten.find((b) => b.benutzername.toLowerCase() === gesucht) ?? null;
+    }
 
     // Einheitliche Fehlermeldung – kein Hinweis, ob Benutzer existiert.
     if (!benutzer || !benutzer.aktiv || !verifyPasswort(daten.passwort, benutzer.passwortHash)) {

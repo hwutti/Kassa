@@ -63,6 +63,10 @@ function LoginForm() {
             value={benutzername}
             onChange={(e) => setBenutzername(e.target.value)}
             autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            inputMode="text"
             autoFocus
           />
         </label>
