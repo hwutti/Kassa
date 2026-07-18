@@ -2,7 +2,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ok, fehler, handleError } from "@/lib/api";
-import { sichtbarkeitWhere } from "@/lib/sichtbarkeit";
+import { verkaufbarWhere } from "@/lib/sichtbarkeit";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
 
     for (const pos of daten.positionen) {
       const produkt = await prisma.produkt.findFirst({
-        where: { AND: [{ id: pos.produktId }, sichtbarkeitWhere(bereich)] },
+        where: { AND: [{ id: pos.produktId }, verkaufbarWhere()] },
         select: { id: true, name: true, preisCent: true, kategorie: { select: { name: true } } },
       });
       if (!produkt) {

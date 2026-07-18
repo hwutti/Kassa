@@ -41,3 +41,21 @@ export function sichtbarkeitWhere(bereich: {
     },
   };
 }
+
+/**
+ * Prüfung beim BESTELLABSCHLUSS: Ein Produkt darf verkauft werden, wenn es aktiv
+ * ist, eine aktive Kategorie hat und einen gültigen Preis besitzt.
+ *
+ * Bewusst OHNE Bindung an einen bestimmten Verkaufsbereich: Ein Warenkorb darf
+ * Produkte aus mehreren Bereichen enthalten (die Bedienperson kann den Bereich
+ * während der Bestellung wechseln). Die harten Verbote (kein Preis, deaktiviert,
+ * inaktive Kategorie) bleiben serverseitig verbindlich.
+ */
+export function verkaufbarWhere(): Prisma.ProduktWhereInput {
+  return {
+    aktiv: true,
+    archiviert: false,
+    preisCent: { gte: 0 },
+    kategorie: { aktiv: true },
+  };
+}
