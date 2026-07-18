@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-neutral-950 text-neutral-100 antialiased;
+  /* Kein horizontales Scrollen – gemäß Spec auf keinem Gerät. */
+  overflow-x: hidden;
+  /* Verhindert Text-Größenänderung beim Drehen auf iOS. */
+  -webkit-text-size-adjust: 100%;
+  /* Kein Doppeltipp-Zoom / bessere Touch-Reaktion. */
+  touch-action: manipulation;
+}
+
+/* Sicheres Ausblenden nativer Tap-Highlights auf Touch-Geräten. */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer components {
+  /* Touch-taugliche Schaltfläche: große Klickfläche, klare Rückmeldung. */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 min-h-touch
+           font-medium select-none transition active:scale-[0.98]
+           disabled:opacity-40 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700;
+  }
+  .btn-ghost {
+    @apply btn bg-neutral-800 text-neutral-100 hover:bg-neutral-700;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700;
+  }
+  .card {
+    @apply rounded-2xl bg-neutral-900 border border-neutral-800;
+  }
+  .input {
+    @apply w-full rounded-xl bg-neutral-800 border border-neutral-700 px-3 py-2
+           min-h-touch text-neutral-100 placeholder-neutral-500
+           focus:outline-none focus:ring-2 focus:ring-brand-600;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+}

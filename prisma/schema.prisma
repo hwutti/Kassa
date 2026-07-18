@@ -1,0 +1,113 @@
+// POS-Kasse – Datenmodell
+// Geldbeträge werden durchgängig als Integer in Cent gespeichert (keine Float-Rundungsfehler).
+// Ein fehlender Preis wird durch preisCent = NULL abgebildet ("Preis fehlt").
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Verkaufsbereich (z. B. "Cafeteria", "Kiosk", "Fest"). Produkte werden Bereichen zugeordnet.
+model Verkaufsbereich {
+  id         String   @id @default(cuid())
+  name       String
+  aktiv      Boolean  @default(true)
+  sortierung Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  produkte    ProduktVerkaufsbereich[]
+  bestellungen Bestellung[]
+}
+
+/// Produktkategorie (z. B. "Getränke", "Speisen").
+model Kategorie {
+  id         String   @id @default(cuid())
+  name       String
+  aktiv      Boolean  @default(true)
+  sortierung Int      @default(0)
+  farbe      String? // optionale Kachelfarbe (Hex), rein kosmetisch
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  produkte Produkt[]
+}
+
+/// Verkaufsprodukt. preisCent = NULL bedeutet "Preis fehlt" -> in der Kasse unsichtbar.
+model Produkt {
+  id          String   @id @default(cuid())
+  name        String
+  beschreibung String?
+  preisCent   Int? // NULL = kein gültiger Preis hinterlegt
+  aktiv       Boolean  @default(true)
+  sortierung  Int      @default(0)
+  bildUrl     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  kategorieId String
+  kategorie   Kategorie @relation(fields: [kategorieId], references: [id], onDelete: Restrict)
+
+  verkaufsbereiche ProduktVerkaufsbereich[]
+  positionen       BestellPosition[]
+
+  @@index([kategorieId])
+}
+
+/// Zuordnung Produkt <-> Verkaufsbereich (n:m).
+model ProduktVerkaufsbereich {
+  produktId         String
+  verkaufsbereichId String
+
+  produkt         Produkt         @relation(fields: [produktId], references: [id], onDelete: Cascade)
+  verkaufsbereich Verkaufsbereich @relation(fields: [verkaufsbereichId], references: [id], onDelete: Cascade)
+
+  @@id([produktId, verkaufsbereichId])
+  @@index([verkaufsbereichId])
+}
+
+/// Abgeschlossene Bestellung. Beträge in Cent. Positionen speichern Preis-Snapshot.
+model Bestellung {
+  id           String   @id @default(cuid())
+  nummer       Int      @unique // fortlaufende, eindeutige Bestellnummer
+  status       String   @default("ABGESCHLOSSEN") // ABGESCHLOSSEN | STORNIERT
+  summeCent    Int
+  erhaltenCent Int? // vom Kunden erhaltener Betrag (optional erfasst)
+  rueckgeldCent Int? // errechnetes Rückgeld
+  // Idempotenzschlüssel des Clients: verhindert doppeltes Speichern derselben Bestellung.
+  clientRef    String   @unique
+  createdAt    DateTime @default(now())
+
+  verkaufsbereichId String
+  verkaufsbereich   Verkaufsbereich @relation(fields: [verkaufsbereichId], references: [id], onDelete: Restrict)
+
+  positionen BestellPosition[]
+
+  @@index([createdAt])
+}
+
+/// Einzelposition einer Bestellung mit Preis-Snapshot zum Zeitpunkt des Hinzufügens.
+model BestellPosition {
+  id             String @id @default(cuid())
+  bestellungId   String
+  produktId      String
+  produktName    String // Snapshot des Namens
+  einzelpreisCent Int   // Snapshot des Preises
+  menge          Int
+  summeCent      Int // einzelpreisCent * menge
+
+  bestellung Bestellung @relation(fields: [bestellungId], references: [id], onDelete: Cascade)
+  produkt    Produkt    @relation(fields: [produktId], references: [id], onDelete: Restrict)
+
+  @@index([bestellungId])
+}
+
+/// Zähler für fortlaufende Bestellnummern (transaktionssicher hochgezählt).
+model Zaehler {
+  id    String @id
+  wert  Int    @default(0)
+}
