@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
+import { useDialog } from "@/components/ui/DialogProvider";
 
 type Benutzer = {
   id: string;
@@ -12,6 +13,7 @@ type Benutzer = {
 };
 
 export function BenutzerAdmin() {
+  const dialog = useDialog();
   const [liste, setListe] = useState<Benutzer[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
   const [ladt, setLadt] = useState(true);
@@ -65,17 +67,26 @@ export function BenutzerAdmin() {
   }
 
   async function passwortZuruecksetzen(b: Benutzer) {
-    const neu = prompt(`Neues Passwort für „${b.benutzername}" (min. 4 Zeichen):`);
+    const neu = await dialog.prompt({
+      titel: "Passwort zurücksetzen",
+      text: `Neues Passwort für „${b.benutzername}" (min. 4 Zeichen):`,
+    });
     if (neu === null) return;
     if (neu.length < 4) {
-      alert("Passwort zu kurz.");
+      await dialog.alert({ text: "Passwort zu kurz (min. 4 Zeichen)." });
       return;
     }
     patch(b, { passwort: neu });
   }
 
   async function loeschen(b: Benutzer) {
-    if (!confirm(`Benutzer „${b.benutzername}" löschen?`)) return;
+    const ok = await dialog.confirm({
+      titel: "Löschen",
+      text: `Benutzer „${b.benutzername}" löschen?`,
+      bestaetigenText: "Löschen",
+      gefahr: true,
+    });
+    if (!ok) return;
     try {
       await jsonFetch(`/api/admin/benutzer/${b.id}`, { method: "DELETE" });
       laden();

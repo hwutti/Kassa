@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
+import { useDialog } from "@/components/ui/DialogProvider";
 import { formatCent } from "@/lib/money";
 
 type Bestellung = {
@@ -20,6 +21,7 @@ type Bestellung = {
 };
 
 export function BestellungenAdmin() {
+  const dialog = useDialog();
   const [liste, setListe] = useState<Bestellung[]>([]);
   const [ladt, setLadt] = useState(true);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -40,10 +42,16 @@ export function BestellungenAdmin() {
   }, []);
 
   async function stornieren(b: Bestellung) {
-    const grund = prompt(`Bestellung Nr. ${b.nummer} stornieren.\nBitte Grund angeben:`);
+    const grund = await dialog.prompt({
+      titel: `Bestellung Nr. ${b.nummer} stornieren`,
+      text: "Bitte Grund angeben:",
+      platzhalter: "z. B. Fehleingabe",
+      bestaetigenText: "Stornieren",
+      gefahr: true,
+    });
     if (grund === null) return;
     if (grund.trim() === "") {
-      alert("Ein Storno-Grund ist erforderlich.");
+      await dialog.alert({ text: "Ein Storno-Grund ist erforderlich." });
       return;
     }
     try {
@@ -53,7 +61,7 @@ export function BestellungenAdmin() {
       });
       laden();
     } catch (e) {
-      alert((e as Error).message);
+      await dialog.alert({ titel: "Fehler", text: (e as Error).message });
     }
   }
 

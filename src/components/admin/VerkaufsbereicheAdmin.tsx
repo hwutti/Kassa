@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
+import { useDialog } from "@/components/ui/DialogProvider";
 
 type Bereich = {
   id: string;
@@ -34,6 +35,7 @@ const LEER: Form = {
 };
 
 export function VerkaufsbereicheAdmin() {
+  const dialog = useDialog();
   const [liste, setListe] = useState<Bereich[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
   const [ladt, setLadt] = useState(true);
@@ -99,7 +101,13 @@ export function VerkaufsbereicheAdmin() {
   }
 
   async function loeschen(b: Bereich) {
-    if (!confirm(`Verkaufsbereich „${b.name}" löschen?`)) return;
+    const ok = await dialog.confirm({
+      titel: "Löschen",
+      text: `Verkaufsbereich „${b.name}" löschen?`,
+      bestaetigenText: "Löschen",
+      gefahr: true,
+    });
+    if (!ok) return;
     try {
       await jsonFetch(`/api/admin/verkaufsbereiche/${b.id}`, { method: "DELETE" });
       laden();

@@ -13,6 +13,7 @@ import {
 } from "@/components/kasse/types";
 import { Geldrechner } from "@/components/kasse/Geldrechner";
 import { parseEuroToCent } from "@/lib/money";
+import { useDialog } from "@/components/ui/DialogProvider";
 
 const BEREICH_KEY = "pos-kasse:verkaufsbereich";
 const OFFENE_BESTELLUNG_KEY = "pos-kasse:offeneBestellung";
@@ -35,6 +36,7 @@ type KonfigDTO = {
 
 export function KasseClient() {
   const { online } = usePwaStatus();
+  const dialog = useDialog();
 
   const [bereiche, setBereiche] = useState<VerkaufsbereichDTO[]>([]);
   const [bereichId, setBereichId] = useState<string | null>(null);
@@ -218,9 +220,15 @@ export function KasseClient() {
     setCheckoutFehler(null);
   }
   // Leeren per Knopf – mit Sicherheitsabfrage (Spec §24).
-  function leerenMitFrage() {
+  async function leerenMitFrage() {
     if (artikelAnzahl === 0) return;
-    if (!confirm("Aktuelle Bestellung wirklich leeren?")) return;
+    const ok = await dialog.confirm({
+      titel: "Bestellung leeren",
+      text: "Aktuelle Bestellung wirklich leeren?",
+      bestaetigenText: "Leeren",
+      gefahr: true,
+    });
+    if (!ok) return;
     warenkorbLeeren();
   }
 

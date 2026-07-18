@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { PwaController } from "@/components/PwaController";
+import { DialogProvider } from "@/components/ui/DialogProvider";
 
 export const metadata: Metadata = {
   title: "POS-Kasse",
@@ -35,7 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {/* Registriert den Service Worker und steuert Verbindungs-/Update-Hinweise. */}
         <PwaController />
-        {children}
+        <DialogProvider>{children}</DialogProvider>
       </body>
     </html>
   );

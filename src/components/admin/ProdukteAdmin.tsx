@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
+import { useDialog } from "@/components/ui/DialogProvider";
 import { formatCent, parseEuroToCent } from "@/lib/money";
 
 type Produkt = {
@@ -46,6 +47,7 @@ const LEER: FormState = {
 };
 
 export function ProdukteAdmin() {
+  const dialog = useDialog();
   const [produkte, setProdukte] = useState<Produkt[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [bereiche, setBereiche] = useState<Bereich[]>([]);
@@ -134,7 +136,13 @@ export function ProdukteAdmin() {
   }
 
   async function loeschen(p: Produkt) {
-    if (!confirm(`Produkt „${p.name}" löschen?`)) return;
+    const ok = await dialog.confirm({
+      titel: "Löschen",
+      text: `Produkt „${p.name}" löschen?`,
+      bestaetigenText: "Löschen",
+      gefahr: true,
+    });
+    if (!ok) return;
     try {
       await jsonFetch(`/api/admin/produkte/${p.id}`, { method: "DELETE" });
       laden();

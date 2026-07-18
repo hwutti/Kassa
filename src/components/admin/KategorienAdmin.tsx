@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
+import { useDialog } from "@/components/ui/DialogProvider";
 import { StammEditor } from "@/components/admin/VerkaufsbereicheAdmin";
 
 type Kategorie = {
@@ -35,6 +36,7 @@ const LEER: Form = {
 };
 
 export function KategorienAdmin() {
+  const dialog = useDialog();
   const [liste, setListe] = useState<Kategorie[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
   const [ladt, setLadt] = useState(true);
@@ -96,7 +98,13 @@ export function KategorienAdmin() {
     }
   }
   async function loeschen(k: Kategorie) {
-    if (!confirm(`Kategorie „${k.name}" löschen?`)) return;
+    const ok = await dialog.confirm({
+      titel: "Löschen",
+      text: `Kategorie „${k.name}" löschen?`,
+      bestaetigenText: "Löschen",
+      gefahr: true,
+    });
+    if (!ok) return;
     try {
       await jsonFetch(`/api/admin/kategorien/${k.id}`, { method: "DELETE" });
       laden();

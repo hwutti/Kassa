@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
+import { useDialog } from "@/components/ui/DialogProvider";
 
 type Veranstaltung = {
   id: string;
@@ -12,6 +13,7 @@ type Veranstaltung = {
 };
 
 export function VeranstaltungenAdmin() {
+  const dialog = useDialog();
   const [liste, setListe] = useState<Veranstaltung[]>([]);
   const [name, setName] = useState("");
   const [fehler, setFehler] = useState<string | null>(null);
@@ -59,7 +61,11 @@ export function VeranstaltungenAdmin() {
   }
 
   async function umbenennen(v: Veranstaltung) {
-    const neu = prompt("Neuer Name der Veranstaltung:", v.name);
+    const neu = await dialog.prompt({
+      titel: "Umbenennen",
+      text: "Neuer Name der Veranstaltung:",
+      standard: v.name,
+    });
     if (!neu || !neu.trim()) return;
     try {
       await jsonFetch(`/api/admin/veranstaltungen/${v.id}`, {
@@ -73,7 +79,13 @@ export function VeranstaltungenAdmin() {
   }
 
   async function loeschen(v: Veranstaltung) {
-    if (!confirm(`Veranstaltung „${v.name}" löschen?`)) return;
+    const ok = await dialog.confirm({
+      titel: "Löschen",
+      text: `Veranstaltung „${v.name}" löschen?`,
+      bestaetigenText: "Löschen",
+      gefahr: true,
+    });
+    if (!ok) return;
     try {
       await jsonFetch(`/api/admin/veranstaltungen/${v.id}`, { method: "DELETE" });
       laden();
