@@ -13,6 +13,7 @@ const NAV = [
   { href: "/admin/veranstaltungen", label: "Veranstaltungen" },
   { href: "/admin/bestellungen", label: "Bestellungen" },
   { href: "/admin/auswertungen", label: "Auswertungen" },
+  { href: "/admin/benutzer", label: "Benutzer" },
   { href: "/admin/einstellungen", label: "Einstellungen" },
 ];
 
