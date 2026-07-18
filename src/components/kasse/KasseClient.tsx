@@ -618,8 +618,9 @@ function BestellPanel(props: {
 
   return (
     <div className="flex flex-col min-h-0 flex-1">
-      {/* Positionsliste */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
+      {/* Scrollbarer Bereich: Positionsliste + Geldrechner.
+          So bleibt der Abschluss unten bei jeder Bildschirmgröße erreichbar. */}
+      <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-2 min-h-0">
         {leer ? (
           <p className="text-neutral-500 text-sm p-4 text-center">Noch keine Artikel gewählt.</p>
         ) : (
@@ -659,22 +660,24 @@ function BestellPanel(props: {
             </div>
           ))
         )}
+
+        {!leer && (
+          <div className="border-t border-neutral-800 pt-2">
+            <Geldrechner
+              summeCent={props.summe}
+              erhaltenText={props.erhaltenText}
+              onErhaltenChange={props.onErhaltenChange}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Summe + Geldrechner + Abschluss */}
+      {/* Fix angepinnter Fuß: Gesamtsumme + Abschluss (immer sichtbar). */}
       <div className="shrink-0 border-t border-neutral-800 p-2 sm:p-3 space-y-2">
         <div className="flex items-baseline justify-between">
           <span className="text-neutral-300">Gesamtsumme</span>
           <span className="text-xl sm:text-2xl font-bold tabular-nums">{formatCent(props.summe)}</span>
         </div>
-
-        {!leer && (
-          <Geldrechner
-            summeCent={props.summe}
-            erhaltenText={props.erhaltenText}
-            onErhaltenChange={props.onErhaltenChange}
-          />
-        )}
 
         {props.checkoutFehler && (
           <p role="alert" className="text-sm text-red-300 bg-red-950/50 rounded-lg px-3 py-2">
@@ -730,6 +733,7 @@ function BelegOverlay({ beleg, onSchliessen }: { beleg: BelegDTO; onSchliessen: 
         return;
       }
       setStorniert(true);
+      setStornoOffen(false); // Storno-Formular schließen, damit „Nächste Bestellung" wieder erscheint
     } catch {
       setFehler("Netzwerkfehler – Storno nicht gespeichert.");
     } finally {
