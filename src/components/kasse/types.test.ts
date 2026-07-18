@@ -7,15 +7,21 @@ function produkt(id: string, preisCent: number): ProduktDTO {
 }
 
 describe("Warenkorb-Berechnung", () => {
-  it("übernimmt beim Hinzufügen den Preis-Snapshot und Menge 1", () => {
-    const pos = ausProdukt(produkt("bier", 350));
-    expect(pos).toEqual({ produktId: "bier", name: "bier", einzelpreisCent: 350, menge: 1 });
+  it("übernimmt beim Hinzufügen den Preis-Snapshot, Menge 1 und den Verkaufsbereich", () => {
+    const pos = ausProdukt(produkt("bier", 350), "vb1");
+    expect(pos).toEqual({
+      produktId: "bier",
+      name: "bier",
+      einzelpreisCent: 350,
+      menge: 1,
+      verkaufsbereichId: "vb1",
+    });
   });
 
   it("berechnet Positions- und Gesamtsumme korrekt", () => {
     const korb: Warenkorb = {
-      bier: { produktId: "bier", name: "Bier", einzelpreisCent: 350, menge: 2 }, // 700
-      wein: { produktId: "wein", name: "Wein", einzelpreisCent: 190, menge: 3 }, // 570
+      bier: { produktId: "bier", name: "Bier", einzelpreisCent: 350, menge: 2, verkaufsbereichId: "a" }, // 700
+      wein: { produktId: "wein", name: "Wein", einzelpreisCent: 190, menge: 3, verkaufsbereichId: "b" }, // 570
     };
     expect(summeCent(korb)).toBe(1270);
     expect(anzahlArtikel(korb)).toBe(5);

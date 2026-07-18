@@ -184,13 +184,15 @@ export function KasseClient() {
 
   // --- Warenkorb-Operationen ---
   function hinzufuegen(p: ProduktDTO) {
+    // Bereich, unter dem hinzugefügt wird (für positionsgenaue Abrechnung).
+    const bId = daten?.verkaufsbereich.id ?? bereichId ?? "";
     setWarenkorb((korb) => {
       const vorhanden = korb[p.id];
       return {
         ...korb,
         [p.id]: vorhanden
           ? { ...vorhanden, menge: vorhanden.menge + 1 }
-          : ausProdukt(p),
+          : ausProdukt(p, bId),
       };
     });
   }
@@ -277,6 +279,7 @@ export function KasseClient() {
             produktId: p.produktId,
             menge: p.menge,
             einzelpreisCent: p.einzelpreisCent,
+            verkaufsbereichId: p.verkaufsbereichId,
           })),
         }),
       });

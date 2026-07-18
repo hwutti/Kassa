@@ -145,9 +145,10 @@ model BestellPosition {
   id              String @id @default(cuid())
   bestellungId    String
   produktId       String
-  produktName     String // Snapshot des Namens zum Verkaufszeitpunkt
-  kategorieName   String @default("") // Snapshot des Kategorienamens
-  einzelpreisCent Int    // Snapshot des Einzelpreises
+  produktName        String // Snapshot des Namens zum Verkaufszeitpunkt
+  kategorieName      String @default("") // Snapshot des Kategorienamens
+  verkaufsbereichName String @default("") // Snapshot des Verkaufsbereichs (positionsgenaue Abrechnung)
+  einzelpreisCent    Int    // Snapshot des Einzelpreises
   menge           Int
   summeCent       Int // einzelpreisCent * menge
 

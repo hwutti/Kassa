@@ -60,11 +60,13 @@ export async function GET(req: Request) {
     const jeProdukt = new Map<string, { umsatzCent: number; menge: number }>();
 
     for (const b of abgeschlossen) {
-      jeBereich.set(b.verkaufsbereich.name, (jeBereich.get(b.verkaufsbereich.name) ?? 0) + b.summeCent);
       const vName = b.veranstaltung?.name ?? "Ohne Veranstaltung";
       jeVeranstaltung.set(vName, (jeVeranstaltung.get(vName) ?? 0) + b.summeCent);
       for (const p of b.positionen) {
         jeKategorie.set(p.kategorieName || "—", (jeKategorie.get(p.kategorieName || "—") ?? 0) + p.summeCent);
+        // Positionsgenau: Umsatz je Verkaufsbereich aus der Position (Fallback: Bestellbereich).
+        const bName = p.verkaufsbereichName || b.verkaufsbereich.name;
+        jeBereich.set(bName, (jeBereich.get(bName) ?? 0) + p.summeCent);
         const cur = jeProdukt.get(p.produktName) ?? { umsatzCent: 0, menge: 0 };
         cur.umsatzCent += p.summeCent;
         cur.menge += p.menge;

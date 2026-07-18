@@ -12,6 +12,8 @@ const PositionSchema = z.object({
   menge: z.number().int().positive().max(999),
   // Preis-Snapshot, den der Client beim Hinzufügen erfasst hat (laufende Bestellung behält Preis).
   einzelpreisCent: z.number().int().min(0),
+  // Verkaufsbereich, unter dem das Produkt hinzugefügt wurde (positionsgenaue Abrechnung).
+  verkaufsbereichId: z.string().min(1).optional(),
 });
 
 const BestellungSchema = z.object({
@@ -44,10 +46,23 @@ export async function POST(req: Request) {
     // 2) Verkaufsbereich muss aktiv sein.
     const bereich = await prisma.verkaufsbereich.findFirst({
       where: { id: daten.verkaufsbereichId, aktiv: true },
-      select: { id: true, istAllgemein: true },
+      select: { id: true, name: true, istAllgemein: true },
     });
     if (!bereich) {
       return fehler("Verkaufsbereich nicht verfügbar – Bestellung nicht gespeichert.", 409);
+    }
+
+    // Namen aller referenzierten Verkaufsbereiche laden (für positionsgenaue Snapshots).
+    const bereichIds = [
+      ...new Set(daten.positionen.map((p) => p.verkaufsbereichId).filter((x): x is string => !!x)),
+    ];
+    const bereichNamen = new Map<string, string>();
+    if (bereichIds.length > 0) {
+      const gefunden = await prisma.verkaufsbereich.findMany({
+        where: { id: { in: bereichIds } },
+        select: { id: true, name: true },
+      });
+      for (const b of gefunden) bereichNamen.set(b.id, b.name);
     }
 
     // 3) Jedes Produkt erneut gegen die Sichtbarkeitsregel prüfen (Server ist die Wahrheit).
@@ -56,6 +71,7 @@ export async function POST(req: Request) {
       produktId: string;
       produktName: string;
       kategorieName: string;
+      verkaufsbereichName: string;
       einzelpreisCent: number;
       menge: number;
       summeCent: number;
@@ -73,10 +89,14 @@ export async function POST(req: Request) {
       }
       // Laufende Bestellung behält den erfassten Preis-Snapshot.
       const einzelpreisCent = pos.einzelpreisCent;
+      // Bereichsname: aus der Position (falls angegeben), sonst der Bestellbereich.
+      const verkaufsbereichName =
+        (pos.verkaufsbereichId && bereichNamen.get(pos.verkaufsbereichId)) || bereich.name;
       positionenAufbereitet.push({
         produktId: produkt.id,
         produktName: produkt.name,
         kategorieName: produkt.kategorie.name,
+        verkaufsbereichName,
         einzelpreisCent,
         menge: pos.menge,
         summeCent: einzelpreisCent * pos.menge,

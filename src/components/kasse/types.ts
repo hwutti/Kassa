@@ -6,12 +6,14 @@ export type WarenkorbPosition = {
   name: string;
   einzelpreisCent: number; // Snapshot: laufende Bestellung behält diesen Preis
   menge: number;
+  // Verkaufsbereich, unter dem das Produkt hinzugefügt wurde (positionsgenaue Abrechnung).
+  verkaufsbereichId: string;
 };
 
 export type Warenkorb = Record<string, WarenkorbPosition>;
 
-export function ausProdukt(p: ProduktDTO): WarenkorbPosition {
-  return { produktId: p.id, name: p.name, einzelpreisCent: p.preisCent, menge: 1 };
+export function ausProdukt(p: ProduktDTO, verkaufsbereichId: string): WarenkorbPosition {
+  return { produktId: p.id, name: p.name, einzelpreisCent: p.preisCent, menge: 1, verkaufsbereichId };
 }
 
 export function summeCent(korb: Warenkorb): number {
