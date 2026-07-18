@@ -78,25 +78,44 @@ set -a; . ./.env; set +a
 log "Installiere Abhängigkeiten …"
 if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-# --- 4) Datenbank: Migrationen + Erst-Admin + optional Demo-Daten -----------
+# --- 4) Datenbank: Migrationen + Erst-Admin + optional Stammdaten -----------
+# Dieses Skript ist zugleich Installer UND Updater:
+#  - frische Installation  -> migrate deploy legt DB inkl. Verlauf an
+#  - bestehende Installation-> migrate deploy wendet nur neue Migrationen an (Daten bleiben)
+#  - Alt-DB ohne Verlauf (P3005, aus früherem "db push") -> wird automatisch und
+#    verlustfrei als Baseline übernommen (Schema additiv angleichen + Migrationen markieren)
 log "Richte Datenbank ein …"
 npx prisma generate
 
-# migrate deploy anwenden. Schlägt es fehl (z. B. P3005: bestehende DB ohne
-# Migrationsverlauf aus einem früheren "db push"), kann mit RESET_DB=1 sauber
-# neu aufgesetzt werden – NUR bei einer Installation ohne echte Daten.
-if ! npx prisma migrate deploy; then
-  if [ "${RESET_DB:-0}" = "1" ]; then
-    log "RESET_DB=1: setze Datenbank neu auf (bestehende Daten gehen verloren) …"
-    rm -f prisma/prod.db prisma/prod.db-journal prisma/dev.db prisma/dev.db-journal
-    npx prisma migrate deploy
-    SEED=1
-  else
-    err "Datenbank-Migration fehlgeschlagen (vermutlich P3005: vorhandene DB ohne Migrationsverlauf)."
-    err "Bei einer NEUEN Installation ohne echte Daten erneut ausführen mit  RESET_DB=1"
-    exit 1
-  fi
+# Optionaler bewusster Neuaufbau (nur ohne echte Daten sinnvoll).
+if [ "${RESET_DB:-0}" = "1" ]; then
+  log "RESET_DB=1: setze Datenbank neu auf (bestehende Daten gehen verloren) …"
+  rm -f prisma/prod.db prisma/prod.db-journal prisma/dev.db prisma/dev.db-journal
+  SEED=1
 fi
+
+MIGERR="$(mktemp)"
+if npx prisma migrate deploy 2>"$MIGERR"; then
+  cat "$MIGERR"
+elif grep -q "P3005" "$MIGERR"; then
+  cat "$MIGERR"
+  log "Bestehende Datenbank ohne Migrationsverlauf erkannt – übernehme sie als Baseline (Daten bleiben erhalten) …"
+  # Schema additiv an den aktuellen Stand angleichen (fügt fehlende Tabellen/Spalten hinzu).
+  npx prisma db push
+  # Alle vorhandenen Migrationen als angewandt markieren, damit künftige Updates sauber laufen.
+  for d in prisma/migrations/*/; do
+    [ -d "$d" ] || continue
+    name="$(basename "$d")"
+    npx prisma migrate resolve --applied "$name" || true
+  done
+  log "Baseline gesetzt – künftige Updates laufen normal über migrate deploy."
+else
+  cat "$MIGERR" >&2
+  rm -f "$MIGERR"
+  err "Datenbank-Migration fehlgeschlagen."
+  exit 1
+fi
+rm -f "$MIGERR"
 
 if [ "$SEED" = "1" ]; then
   log "Spiele Stammdaten (Bereiche/Kategorien/Produkte ohne Preise, Standard-Veranstaltung) ein …"
