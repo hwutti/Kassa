@@ -133,27 +133,7 @@ export async function POST(req: Request) {
   }
 }
 
-/** GET /api/bestellungen – letzte Bestellungen (für den Admin-Bereich). */
-export async function GET(req: Request) {
-  try {
-    const url = new URL(req.url);
-    const limit = Math.min(Number(url.searchParams.get("limit") ?? 50) || 50, 200);
-    const bestellungen = await prisma.bestellung.findMany({
-      orderBy: { createdAt: "desc" },
-      take: limit,
-      include: { positionen: true, verkaufsbereich: { select: { name: true } } },
-    });
-    return ok(
-      bestellungen.map((b) => ({
-        ...serialize(b),
-        verkaufsbereichName: b.verkaufsbereich.name,
-      })),
-      { headers: { "Cache-Control": "no-store" } },
-    );
-  } catch (e) {
-    return handleError(e);
-  }
-}
+// Hinweis: Das Auflisten von Bestellungen erfolgt geschützt über /api/admin/bestellungen.
 
 type BestellungMitPositionen = Prisma.BestellungGetPayload<{ include: { positionen: true } }>;
 
