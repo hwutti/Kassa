@@ -9,6 +9,38 @@ Stack: **Next.js 16** (App Router) · **Prisma** (SQLite) · **Tailwind CSS** ·
 
 ---
 
+## Installation auf dem Server (One-Liner)
+
+Komplette Installation auf einem Linux-Server (Node wird bei Bedarf mitinstalliert,
+Datenbank eingerichtet, App gebaut und als systemd-Dienst gestartet):
+
+```bash
+sudo -H bash -c 'DIR=/opt/kassa PORT=3000 SEED=1 bash <(curl -fsSL https://raw.githubusercontent.com/hwutti/Kassa/main/install.sh)'
+```
+
+Danach läuft die Kasse unter `http://SERVER:3000/kasse`. Der Aufruf ist **idempotent** –
+erneut ausgeführt aktualisiert er die Installation (Code neu holen, bauen, Dienst neu starten).
+
+| Variable | Zweck | Standard |
+| --- | --- | --- |
+| `DIR` | Zielverzeichnis | `/opt/kassa` |
+| `PORT` | HTTP-Port | `3000` |
+| `SEED` | Demo-Daten einspielen (`1`/`0`) | `0` |
+| `BRANCH` | Git-Branch | `main` |
+
+Nur aktualisieren (ohne Demo-Daten):
+
+```bash
+sudo -H bash -c 'DIR=/opt/kassa bash <(curl -fsSL https://raw.githubusercontent.com/hwutti/Kassa/main/install.sh)'
+```
+
+Dienst verwalten: `systemctl status|restart|stop kassa` · Logs: `journalctl -u kassa -f`
+
+> Für den produktiven PWA-Betrieb (Installierbarkeit, Service Worker) ist **HTTPS** erforderlich –
+> üblicherweise über einen Reverse-Proxy (nginx/Caddy) vor dem Port.
+
+---
+
 ## Schnellstart (Entwicklung)
 
 ```bash
