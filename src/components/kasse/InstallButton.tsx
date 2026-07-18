@@ -75,7 +75,23 @@ export function InstallButton() {
 
   return (
     <button onClick={klick} className="btn-ghost py-1.5 text-sm" title="Kasse als App installieren">
-      <span aria-hidden>⬇</span>
+      {/* Sauberes Download-/Install-Icon (nutzt die Textfarbe des Buttons). */}
+      <svg
+        viewBox="0 0 24 24"
+        width="18"
+        height="18"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        className="shrink-0"
+      >
+        <path d="M12 3v11" />
+        <path d="m7 10 5 5 5-5" />
+        <path d="M5 20h14" />
+      </svg>
       <span className="hidden sm:inline">Installieren</span>
     </button>
   );

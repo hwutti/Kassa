@@ -497,19 +497,31 @@ export function KasseClient() {
   );
 }
 
-/** Aktuelle Uhrzeit im Kopf (Spec §13). Aktualisiert jede Minute. */
+/** Aktuelles Datum + Uhrzeit im Kopf (Spec §13). Aktualisiert regelmäßig. */
 function Uhr() {
-  const [zeit, setZeit] = useState<string>("");
+  const [text, setText] = useState<string>("");
   useEffect(() => {
-    const tick = () =>
-      setZeit(new Date().toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" }));
+    const tick = () => {
+      const jetzt = new Date();
+      const datum = jetzt.toLocaleDateString("de-AT", {
+        weekday: "short",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+      const zeit = jetzt.toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" });
+      setText(`${datum} · ${zeit}`);
+    };
     tick();
     const iv = window.setInterval(tick, 15000);
     return () => window.clearInterval(iv);
   }, []);
   return (
-    <span className="hidden sm:inline text-sm tabular-nums text-neutral-400" suppressHydrationWarning>
-      {zeit}
+    <span
+      className="hidden md:inline text-sm tabular-nums text-neutral-400 whitespace-nowrap"
+      suppressHydrationWarning
+    >
+      {text}
     </span>
   );
 }
