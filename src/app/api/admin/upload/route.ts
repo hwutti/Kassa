@@ -6,11 +6,12 @@ import { ok, fehler, handleError } from "@/lib/api";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+const MAX_BYTES = 8 * 1024 * 1024; // 8 MB (größere Logos zulassen)
 
-// Erlaubte Bildtypen werden anhand der Magic Bytes geprüft (nicht nur Content-Type).
-// SVG ist bewusst NICHT erlaubt (kann Skripte enthalten).
-function erkenneTyp(buf: Buffer): "png" | "jpg" | "webp" | null {
+// Erlaubte Bildtypen werden anhand der Magic Bytes / des Inhalts geprüft.
+// SVG ist als Logo erlaubt; es wird ausschließlich über <img src> eingebunden
+// (dort werden eingebettete Skripte NICHT ausgeführt).
+function erkenneTyp(buf: Buffer): "png" | "jpg" | "webp" | "svg" | null {
   if (buf.length >= 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47)
     return "png";
   if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "jpg";
@@ -20,6 +21,9 @@ function erkenneTyp(buf: Buffer): "png" | "jpg" | "webp" | null {
     buf.toString("ascii", 8, 12) === "WEBP"
   )
     return "webp";
+  // SVG: XML-/SVG-Wurzel im Dateikopf.
+  const kopf = buf.subarray(0, 1024).toString("utf8").toLowerCase();
+  if (kopf.includes("<svg")) return "svg";
   return null;
 }
 
@@ -32,13 +36,13 @@ export async function POST(req: Request) {
       return fehler("Keine Datei übermittelt.", 400);
     }
     if (datei.size > MAX_BYTES) {
-      return fehler("Datei zu groß (max. 2 MB).", 413);
+      return fehler("Datei zu groß (max. 8 MB).", 413);
     }
 
     const buf = Buffer.from(await datei.arrayBuffer());
     const typ = erkenneTyp(buf);
     if (!typ) {
-      return fehler("Nur PNG-, JPG- oder WebP-Bilder sind erlaubt.", 415);
+      return fehler("Nur PNG-, JPG-, WebP- oder SVG-Bilder sind erlaubt.", 415);
     }
 
     // Sicherer, zufälliger Dateiname – der vom Client gelieferte Name wird ignoriert.

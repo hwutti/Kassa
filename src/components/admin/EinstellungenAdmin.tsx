@@ -75,11 +75,13 @@ export function EinstellungenAdmin() {
       </div>
 
       <div>
-        <span className="text-sm text-neutral-400">Logo (PNG/JPG/WebP, transparent empfohlen)</span>
+        <span className="text-sm text-neutral-400">
+          Logo (PNG/JPG/WebP/SVG, transparent empfohlen, max. 8 MB)
+        </span>
         <div className="mt-1 flex items-center gap-3">
           <input
             type="file"
-            accept="image/png,image/jpeg,image/webp"
+            accept="image/png,image/jpeg,image/webp,image/svg+xml"
             className="text-sm text-neutral-300 file:mr-2 file:rounded-lg file:border-0 file:bg-neutral-700 file:px-3 file:py-1.5 file:text-neutral-100"
             onChange={(e) => {
               const f = e.target.files?.[0];

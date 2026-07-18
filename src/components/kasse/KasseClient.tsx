@@ -307,7 +307,7 @@ export function KasseClient() {
           <img
             src={konfig?.logoUrl || "/logo.svg"}
             alt=""
-            className="h-9 w-9 object-contain shrink-0"
+            className="h-10 sm:h-12 w-auto max-w-[160px] sm:max-w-[220px] object-contain shrink-0"
           />
           <div className="min-w-0 leading-tight">
             <div className="text-base sm:text-lg font-semibold truncate">
