@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 
-type Konfig = { titel: string; untertitel: string | null; logoUrl: string | null };
+type Konfig = { titel: string; untertitel: string | null; logoUrl: string | null; logoHoehe: number };
 
 export function EinstellungenAdmin() {
   const [titel, setTitel] = useState("");
   const [untertitel, setUntertitel] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoHoehe, setLogoHoehe] = useState(48);
   const [fehler, setFehler] = useState<string | null>(null);
   const [gespeichert, setGespeichert] = useState(false);
   const [ladeBild, setLadeBild] = useState(false);
@@ -19,6 +20,7 @@ export function EinstellungenAdmin() {
         setTitel(k.titel);
         setUntertitel(k.untertitel ?? "");
         setLogoUrl(k.logoUrl);
+        setLogoHoehe(k.logoHoehe ?? 48);
       })
       .catch((e) => setFehler((e as Error).message));
   }, []);
@@ -45,7 +47,12 @@ export function EinstellungenAdmin() {
     try {
       await jsonFetch("/api/admin/konfiguration", {
         method: "PATCH",
-        body: JSON.stringify({ titel: titel.trim() || "Kasse", untertitel: untertitel.trim() || null, logoUrl }),
+        body: JSON.stringify({
+          titel: titel.trim() || "Kasse",
+          untertitel: untertitel.trim() || null,
+          logoUrl,
+          logoHoehe,
+        }),
       });
       setGespeichert(true);
       setTimeout(() => setGespeichert(false), 2500);
@@ -60,19 +67,38 @@ export function EinstellungenAdmin() {
         Logo und Titel erscheinen im Kopf der Kassenansicht. Ein transparentes PNG wirkt am besten.
       </p>
 
-      {/* Vorschau */}
+      {/* Live-Vorschau des Headers */}
       <div className="card p-3 flex items-center gap-3">
-        {logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={logoUrl} alt="Logo" className="h-12 w-12 object-contain" />
-        ) : (
-          <span className="text-3xl">🧾</span>
-        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logoUrl || "/logo.svg"}
+          alt="Logo"
+          style={{ height: logoHoehe }}
+          className="w-auto max-w-[280px] object-contain"
+        />
         <div>
           <div className="font-semibold">{titel || "Kasse"}</div>
           {untertitel && <div className="text-xs text-neutral-400">{untertitel}</div>}
         </div>
       </div>
+
+      {/* Logogröße */}
+      <label className="block">
+        <span className="text-sm text-neutral-400">Logo-Größe: {logoHoehe} px</span>
+        <input
+          type="range"
+          min={16}
+          max={160}
+          step={2}
+          value={logoHoehe}
+          onChange={(e) => setLogoHoehe(Number(e.target.value))}
+          className="w-full mt-1 accent-brand-600"
+        />
+        <div className="flex justify-between text-[11px] text-neutral-500">
+          <span>klein</span>
+          <span>groß</span>
+        </div>
+      </label>
 
       <div>
         <span className="text-sm text-neutral-400">

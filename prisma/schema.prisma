@@ -136,6 +136,7 @@ model Einstellung {
   titel      String   @default("Kirchtagsfest Kasse")
   untertitel String?
   logoUrl    String?
+  logoHoehe  Int      @default(48) // Höhe des Logos im Header in Pixel
   updatedAt  DateTime @updatedAt
 }
 

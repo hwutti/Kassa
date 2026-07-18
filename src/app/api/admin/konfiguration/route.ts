@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const e = await getEinstellung();
-    return ok({ titel: e.titel, untertitel: e.untertitel, logoUrl: e.logoUrl });
+    return ok({ titel: e.titel, untertitel: e.untertitel, logoUrl: e.logoUrl, logoHoehe: e.logoHoehe });
   } catch (e) {
     return handleError(e);
   }
@@ -19,15 +19,16 @@ const UpdateSchema = z.object({
   titel: z.string().trim().min(1).max(100).optional(),
   untertitel: z.string().trim().max(150).nullable().optional(),
   logoUrl: z.string().trim().max(300).nullable().optional(),
+  logoHoehe: z.number().int().min(16).max(160).optional(),
 });
 
-/** PATCH /api/admin/konfiguration – Header-Logo und Titel ändern. */
+/** PATCH /api/admin/konfiguration – Header-Logo, Größe und Titel ändern. */
 export async function PATCH(req: Request) {
   try {
     await getEinstellung(); // sicherstellen, dass der Datensatz existiert
     const daten = UpdateSchema.parse(await req.json());
     const e = await prisma.einstellung.update({ where: { id: "app" }, data: daten });
-    return ok({ titel: e.titel, untertitel: e.untertitel, logoUrl: e.logoUrl });
+    return ok({ titel: e.titel, untertitel: e.untertitel, logoUrl: e.logoUrl, logoHoehe: e.logoHoehe });
   } catch (e) {
     return handleError(e);
   }

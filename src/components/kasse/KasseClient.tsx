@@ -29,6 +29,7 @@ type KonfigDTO = {
   titel: string;
   untertitel: string | null;
   logoUrl: string | null;
+  logoHoehe: number;
   aktiveVeranstaltung: { id: string; name: string } | null;
 };
 
@@ -307,7 +308,8 @@ export function KasseClient() {
           <img
             src={konfig?.logoUrl || "/logo.svg"}
             alt=""
-            className="h-10 sm:h-12 w-auto max-w-[160px] sm:max-w-[220px] object-contain shrink-0"
+            style={{ height: konfig?.logoHoehe ?? 48 }}
+            className="w-auto max-w-[45vw] sm:max-w-[280px] object-contain shrink-0"
           />
           <div className="min-w-0 leading-tight">
             <div className="text-base sm:text-lg font-semibold truncate">
