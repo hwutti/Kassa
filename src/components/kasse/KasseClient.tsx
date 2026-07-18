@@ -14,6 +14,7 @@ import {
 import { Geldrechner } from "@/components/kasse/Geldrechner";
 import { parseEuroToCent } from "@/lib/money";
 import { useDialog } from "@/components/ui/DialogProvider";
+import { InstallButton } from "@/components/kasse/InstallButton";
 
 const BEREICH_KEY = "pos-kasse:verkaufsbereich";
 const OFFENE_BESTELLUNG_KEY = "pos-kasse:offeneBestellung";
@@ -358,6 +359,7 @@ export function KasseClient() {
             />
             <span className="hidden sm:inline">{online ? "Online" : "Offline"}</span>
           </span>
+          <InstallButton />
           <Link href="/admin" className="btn-ghost py-1.5 text-sm">
             Verwaltung
           </Link>

@@ -10,10 +10,19 @@ type PwaState = {
   online: boolean;
   /** true = eine neue App-Version wartet auf Aktivierung. */
   updateReady: boolean;
+  /** true = der Browser hat ein natives Installations-Event bereitgestellt. */
+  installierbar: boolean;
 };
 
 // Initial optimistisch online; der erste Health-Check korrigiert das bei Bedarf.
-let state: PwaState = { online: true, updateReady: false };
+let state: PwaState = { online: true, updateReady: false, installierbar: false };
+
+// Das aufgeschobene beforeinstallprompt-Event (Chrome/Edge/Android).
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+let installEvent: InstallPromptEvent | null = null;
 
 let wartenderWorker: ServiceWorker | null = null;
 // Signalisiert, ob gerade eine Bestellung bearbeitet wird. Ein Update darf sie nicht zerstören.
@@ -34,9 +43,30 @@ function emit() {
 
 function setState(patch: Partial<PwaState>) {
   const next = { ...state, ...patch };
-  if (next.online === state.online && next.updateReady === state.updateReady) return;
+  if (
+    next.online === state.online &&
+    next.updateReady === state.updateReady &&
+    next.installierbar === state.installierbar
+  )
+    return;
   state = next;
   emit();
+}
+
+/** Merkt das native Installations-Event für den manuellen Install-Button. */
+export function setInstallEvent(e: InstallPromptEvent | null) {
+  installEvent = e;
+  setState({ installierbar: e !== null });
+}
+
+/** Löst die native Installation aus (falls verfügbar). */
+export async function installAusloesen(): Promise<"accepted" | "dismissed" | "unavailable"> {
+  if (!installEvent) return "unavailable";
+  await installEvent.prompt();
+  const wahl = await installEvent.userChoice;
+  installEvent = null;
+  setState({ installierbar: false });
+  return wahl.outcome;
 }
 
 export function setOnline(online: boolean) {
@@ -73,7 +103,7 @@ function getSnapshot(): PwaState {
   return state;
 }
 
-const serverSnapshot: PwaState = { online: true, updateReady: false };
+const serverSnapshot: PwaState = { online: true, updateReady: false, installierbar: false };
 function getServerSnapshot(): PwaState {
   return serverSnapshot;
 }

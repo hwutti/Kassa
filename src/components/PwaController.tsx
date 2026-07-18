@@ -7,6 +7,7 @@ import {
   updateAnwenden,
   usePwaStatus,
   istBestellungOffen,
+  setInstallEvent,
 } from "@/lib/pwa-store";
 
 /**
@@ -52,6 +53,22 @@ export function PwaController() {
     const onFocus = () => reg?.update().catch(() => undefined);
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
+  // --- Installierbarkeit (natives beforeinstallprompt-Event) ---
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onPrompt = (e: Event) => {
+      e.preventDefault(); // Standard-Mini-Infobar unterdrücken, Event für später merken
+      setInstallEvent(e as never);
+    };
+    const onInstalled = () => setInstallEvent(null);
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
   }, []);
 
   // --- Verbindungsüberwachung: navigator-Events + Health-Ping ---
