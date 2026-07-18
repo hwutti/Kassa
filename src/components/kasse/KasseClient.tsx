@@ -19,6 +19,7 @@ const BEREICH_KEY = "pos-kasse:verkaufsbereich";
 const OFFENE_BESTELLUNG_KEY = "pos-kasse:offeneBestellung";
 
 type BelegDTO = {
+  id: string;
   nummer: number;
   summeCent: number;
   erhaltenCent: number | null;
@@ -700,20 +701,59 @@ function BestellPanel(props: {
 }
 
 function BelegOverlay({ beleg, onSchliessen }: { beleg: BelegDTO; onSchliessen: () => void }) {
+  const [stornoOffen, setStornoOffen] = useState(false);
+  const [grund, setGrund] = useState("");
+  const [passwort, setPasswort] = useState("");
+  const [laedt, setLaedt] = useState(false);
+  const [fehler, setFehler] = useState<string | null>(null);
+  const [storniert, setStorniert] = useState(false);
+
+  async function stornieren() {
+    if (!grund.trim()) {
+      setFehler("Bitte einen Grund angeben.");
+      return;
+    }
+    setLaedt(true);
+    setFehler(null);
+    try {
+      const res = await fetch(`/api/bestellungen/${beleg.id}/storno`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grund: grund.trim(), passwort: passwort || undefined }),
+      });
+      const info = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setFehler(info.error ?? "Storno fehlgeschlagen.");
+        return;
+      }
+      setStorniert(true);
+    } catch {
+      setFehler("Netzwerkfehler – Storno nicht gespeichert.");
+    } finally {
+      setLaedt(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="card w-full max-w-sm p-5 space-y-4">
         <div className="text-center">
-          <div className="mx-auto mb-2 h-12 w-12 rounded-full bg-brand-600/20 flex items-center justify-center text-brand-50 text-2xl">
-            ✓
+          <div
+            className={`mx-auto mb-2 h-12 w-12 rounded-full flex items-center justify-center text-2xl ${
+              storniert ? "bg-red-600/20 text-red-300" : "bg-brand-600/20 text-brand-50"
+            }`}
+          >
+            {storniert ? "↩" : "✓"}
           </div>
-          <h2 className="text-lg font-semibold">Bestellung gespeichert</h2>
+          <h2 className="text-lg font-semibold">
+            {storniert ? "Bestellung storniert" : "Bestellung gespeichert"}
+          </h2>
           <p className="text-neutral-400 text-sm">Bestell-Nr. {beleg.nummer}</p>
         </div>
 
-        <div className="space-y-1 text-sm max-h-48 overflow-y-auto">
+        <div className="space-y-1 text-sm max-h-40 overflow-y-auto">
           {beleg.positionen.map((p, i) => (
-            <div key={i} className="flex justify-between tabular-nums">
+            <div key={i} className={`flex justify-between tabular-nums ${storniert ? "line-through text-neutral-500" : ""}`}>
               <span className="truncate pr-2">
                 {p.menge}× {p.produktName}
               </span>
@@ -723,7 +763,7 @@ function BelegOverlay({ beleg, onSchliessen }: { beleg: BelegDTO; onSchliessen: 
         </div>
 
         <div className="border-t border-neutral-800 pt-3 space-y-1 text-sm tabular-nums">
-          <div className="flex justify-between font-semibold text-base">
+          <div className={`flex justify-between font-semibold text-base ${storniert ? "line-through text-neutral-500" : ""}`}>
             <span>Summe</span>
             <span>{formatCent(beleg.summeCent)}</span>
           </div>
@@ -741,9 +781,49 @@ function BelegOverlay({ beleg, onSchliessen }: { beleg: BelegDTO; onSchliessen: 
           )}
         </div>
 
-        <button className="btn-primary w-full" onClick={onSchliessen}>
-          Nächste Bestellung
-        </button>
+        {/* Storno-Formular */}
+        {stornoOffen && !storniert && (
+          <div className="space-y-2 border-t border-neutral-800 pt-3">
+            <input
+              className="input"
+              placeholder="Storno-Grund (z. B. Fehleingabe)"
+              value={grund}
+              onChange={(e) => setGrund(e.target.value)}
+              autoFocus
+            />
+            <input
+              className="input"
+              type="password"
+              placeholder="Admin-Passwort (falls nicht angemeldet)"
+              value={passwort}
+              onChange={(e) => setPasswort(e.target.value)}
+              autoComplete="off"
+            />
+            {fehler && <p className="text-sm text-red-300">{fehler}</p>}
+            <div className="flex gap-2">
+              <button className="btn-ghost flex-1" onClick={() => setStornoOffen(false)} disabled={laedt}>
+                Zurück
+              </button>
+              <button className="btn-danger flex-1" onClick={stornieren} disabled={laedt}>
+                {laedt ? "Storniere …" : "Storno bestätigen"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Aktionen */}
+        {!stornoOffen && (
+          <div className="flex gap-2">
+            {!storniert && (
+              <button className="btn-ghost text-red-300" onClick={() => setStornoOffen(true)}>
+                Stornieren
+              </button>
+            )}
+            <button className="btn-primary flex-1" onClick={onSchliessen}>
+              Nächste Bestellung
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -55,7 +55,7 @@ export function BestellungenAdmin() {
       return;
     }
     try {
-      await jsonFetch(`/api/admin/bestellungen/${b.id}/storno`, {
+      await jsonFetch(`/api/bestellungen/${b.id}/storno`, {
         method: "POST",
         body: JSON.stringify({ grund: grund.trim() }),
       });
