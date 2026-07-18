@@ -1,0 +1,4 @@
+# Zeilenenden normalisieren: Standard automatisch, Shell-Skripte immer LF
+# (CRLF würde install.sh auf Linux unbrauchbar machen).
+* text=auto
+*.sh text eol=lf
