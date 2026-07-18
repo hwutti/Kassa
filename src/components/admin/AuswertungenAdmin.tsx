@@ -13,20 +13,27 @@ type Auswertung = {
   anzahlStorniert: number;
   jeVerkaufsbereich: NameUmsatz[];
   jeKategorie: NameUmsatz[];
+  jeVeranstaltung: NameUmsatz[];
   jeProdukt: { name: string; umsatzCent: number; menge: number }[];
 };
 type Bereich = { id: string; name: string };
+type Veranstaltung = { id: string; name: string; aktiv: boolean };
 
 export function AuswertungenAdmin() {
   const [daten, setDaten] = useState<Auswertung | null>(null);
   const [bereiche, setBereiche] = useState<Bereich[]>([]);
+  const [veranstaltungen, setVeranstaltungen] = useState<Veranstaltung[]>([]);
   const [von, setVon] = useState("");
   const [bis, setBis] = useState("");
   const [bereich, setBereich] = useState("");
+  const [veranstaltung, setVeranstaltung] = useState("");
   const [fehler, setFehler] = useState<string | null>(null);
 
   useEffect(() => {
     jsonFetch<Bereich[]>("/api/admin/verkaufsbereiche").then(setBereiche).catch(() => undefined);
+    jsonFetch<Veranstaltung[]>("/api/admin/veranstaltungen")
+      .then(setVeranstaltungen)
+      .catch(() => undefined);
   }, []);
 
   const laden = useCallback(async () => {
@@ -34,13 +41,14 @@ export function AuswertungenAdmin() {
     if (von) q.set("von", von);
     if (bis) q.set("bis", bis);
     if (bereich) q.set("verkaufsbereich", bereich);
+    if (veranstaltung) q.set("veranstaltung", veranstaltung);
     try {
       setDaten(await jsonFetch<Auswertung>(`/api/admin/auswertungen?${q.toString()}`));
       setFehler(null);
     } catch (e) {
       setFehler((e as Error).message);
     }
-  }, [von, bis, bereich]);
+  }, [von, bis, bereich, veranstaltung]);
 
   useEffect(() => {
     laden();
@@ -59,6 +67,22 @@ export function AuswertungenAdmin() {
           <input type="date" className="input mt-1" value={bis} onChange={(e) => setBis(e.target.value)} />
         </label>
         <label className="block">
+          <span className="text-xs text-neutral-400">Veranstaltung</span>
+          <select
+            className="input mt-1"
+            value={veranstaltung}
+            onChange={(e) => setVeranstaltung(e.target.value)}
+          >
+            <option value="">Alle</option>
+            {veranstaltungen.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+                {v.aktiv ? " (aktiv)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
           <span className="text-xs text-neutral-400">Verkaufsbereich</span>
           <select className="input mt-1" value={bereich} onChange={(e) => setBereich(e.target.value)}>
             <option value="">Alle</option>
@@ -69,13 +93,14 @@ export function AuswertungenAdmin() {
             ))}
           </select>
         </label>
-        {(von || bis || bereich) && (
+        {(von || bis || bereich || veranstaltung) && (
           <button
             className="btn-ghost"
             onClick={() => {
               setVon("");
               setBis("");
               setBereich("");
+              setVeranstaltung("");
             }}
           >
             Zurücksetzen
@@ -95,6 +120,8 @@ export function AuswertungenAdmin() {
             <Kennzahl label="Ø Bestellwert" wert={formatCent(daten.durchschnittCent)} />
             <Kennzahl label="Storniert" wert={String(daten.anzahlStorniert)} />
           </div>
+
+          <UmsatzListe titel="Umsatz je Veranstaltung" eintraege={daten.jeVeranstaltung} />
 
           <div className="grid gap-4 lg:grid-cols-2">
             <UmsatzListe titel="Umsatz je Verkaufsbereich" eintraege={daten.jeVerkaufsbereich} />

@@ -96,6 +96,12 @@ export async function POST(req: Request) {
     const rueckgeldCent =
       erhaltenCent !== null && erhaltenCent >= summeCent ? erhaltenCent - summeCent : null;
 
+    // Aktive Veranstaltung ermitteln – die Bestellung wird ihr zugeordnet (getrennte Abrechnung).
+    const aktiveVeranstaltung = await prisma.veranstaltung.findFirst({
+      where: { aktiv: true },
+      select: { id: true },
+    });
+
     // 4) Transaktion: Bestellnummer hochzählen + Bestellung + Positionen atomar anlegen.
     try {
       const erstellt = await prisma.$transaction(async (tx) => {
@@ -108,6 +114,7 @@ export async function POST(req: Request) {
             nummer: zaehler.wert,
             clientRef: daten.clientRef,
             verkaufsbereichId: daten.verkaufsbereichId,
+            veranstaltungId: aktiveVeranstaltung?.id ?? null,
             summeCent,
             erhaltenCent,
             rueckgeldCent,

@@ -14,6 +14,7 @@ export async function GET(req: Request) {
     const vonStr = url.searchParams.get("von");
     const bisStr = url.searchParams.get("bis");
     const verkaufsbereichId = url.searchParams.get("verkaufsbereich");
+    const veranstaltungId = url.searchParams.get("veranstaltung");
 
     const von = vonStr ? new Date(vonStr + "T00:00:00") : undefined;
     const bis = bisStr ? new Date(bisStr + "T23:59:59.999") : undefined;
@@ -25,10 +26,15 @@ export async function GET(req: Request) {
       if (bis) (zeitraum.createdAt as Prisma.DateTimeFilter).lte = bis;
     }
     if (verkaufsbereichId) zeitraum.verkaufsbereichId = verkaufsbereichId;
+    if (veranstaltungId) zeitraum.veranstaltungId = veranstaltungId;
 
     const abgeschlossen = await prisma.bestellung.findMany({
       where: { ...zeitraum, status: "ABGESCHLOSSEN" },
-      include: { positionen: true, verkaufsbereich: { select: { name: true } } },
+      include: {
+        positionen: true,
+        verkaufsbereich: { select: { name: true } },
+        veranstaltung: { select: { name: true } },
+      },
     });
     const anzahlStorniert = await prisma.bestellung.count({
       where: { ...zeitraum, status: "STORNIERT" },
@@ -50,10 +56,13 @@ export async function GET(req: Request) {
     // Aggregationen
     const jeBereich = new Map<string, number>();
     const jeKategorie = new Map<string, number>();
+    const jeVeranstaltung = new Map<string, number>();
     const jeProdukt = new Map<string, { umsatzCent: number; menge: number }>();
 
     for (const b of abgeschlossen) {
       jeBereich.set(b.verkaufsbereich.name, (jeBereich.get(b.verkaufsbereich.name) ?? 0) + b.summeCent);
+      const vName = b.veranstaltung?.name ?? "Ohne Veranstaltung";
+      jeVeranstaltung.set(vName, (jeVeranstaltung.get(vName) ?? 0) + b.summeCent);
       for (const p of b.positionen) {
         jeKategorie.set(p.kategorieName || "—", (jeKategorie.get(p.kategorieName || "—") ?? 0) + p.summeCent);
         const cur = jeProdukt.get(p.produktName) ?? { umsatzCent: 0, menge: 0 };
@@ -75,6 +84,7 @@ export async function GET(req: Request) {
         anzahlStorniert,
         jeVerkaufsbereich: sortMap(jeBereich),
         jeKategorie: sortMap(jeKategorie),
+        jeVeranstaltung: sortMap(jeVeranstaltung),
         jeProdukt: [...jeProdukt.entries()]
           .map(([name, v]) => ({ name, umsatzCent: v.umsatzCent, menge: v.menge }))
           .sort((a, b) => b.umsatzCent - a.umsatzCent),

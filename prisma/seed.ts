@@ -15,9 +15,22 @@ async function main() {
   await prisma.produkt.deleteMany();
   await prisma.kategorie.deleteMany();
   await prisma.verkaufsbereich.deleteMany();
+  await prisma.veranstaltung.deleteMany();
   await prisma.zaehler.deleteMany();
 
   await prisma.zaehler.create({ data: { id: "bestellnummer", wert: 0 } });
+
+  // Anwendungs-Einstellungen (Header-Titel).
+  await prisma.einstellung.upsert({
+    where: { id: "app" },
+    update: {},
+    create: { id: "app", titel: "Kirchtagsfest Kasse", untertitel: "Festkasse" },
+  });
+
+  // Standard-Veranstaltung (aktiv) – neue Bestellungen werden ihr zugeordnet.
+  await prisma.veranstaltung.create({
+    data: { name: "Kirchtagsfest", beschreibung: "Standard-Veranstaltung", aktiv: true },
+  });
 
   // --- Administrator (Passwort aus Umgebungsvariable, sonst Standard mit Warnung) ---
   const adminName = process.env.ADMIN_BENUTZER || "admin";

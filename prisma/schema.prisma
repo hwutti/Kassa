@@ -103,10 +103,40 @@ model Bestellung {
   verkaufsbereichId String
   verkaufsbereich   Verkaufsbereich @relation(fields: [verkaufsbereichId], references: [id], onDelete: Restrict)
 
+  // Zuordnung zur Veranstaltung (für getrennte Abrechnungen). NULL = keine.
+  veranstaltungId String?
+  veranstaltung   Veranstaltung? @relation(fields: [veranstaltungId], references: [id], onDelete: SetNull)
+
   positionen BestellPosition[]
 
   @@index([createdAt])
   @@index([status])
+  @@index([veranstaltungId])
+}
+
+/// Veranstaltung (z. B. "Kirchtag 2026"). Abrechnungen werden je Veranstaltung getrennt.
+model Veranstaltung {
+  id          String   @id @default(cuid())
+  name        String
+  beschreibung String?
+  aktiv       Boolean  @default(false) // die aktuell laufende Veranstaltung
+  von         DateTime?
+  bis         DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  bestellungen Bestellung[]
+
+  @@index([aktiv])
+}
+
+/// Anwendungs-Einstellungen (einzeiliger Datensatz id="app"): Header-Logo und Titel.
+model Einstellung {
+  id         String   @id @default("app")
+  titel      String   @default("Kirchtagsfest Kasse")
+  untertitel String?
+  logoUrl    String?
+  updatedAt  DateTime @updatedAt
 }
 
 /// Einzelposition einer Bestellung mit Snapshot von Name, Kategorie und Preis.

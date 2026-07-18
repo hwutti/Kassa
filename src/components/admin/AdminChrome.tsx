@@ -10,8 +10,10 @@ const NAV = [
   { href: "/admin/preise", label: "Preise" },
   { href: "/admin/kategorien", label: "Kategorien" },
   { href: "/admin/verkaufsbereiche", label: "Verkaufsbereiche" },
+  { href: "/admin/veranstaltungen", label: "Veranstaltungen" },
   { href: "/admin/bestellungen", label: "Bestellungen" },
   { href: "/admin/auswertungen", label: "Auswertungen" },
+  { href: "/admin/einstellungen", label: "Einstellungen" },
 ];
 
 export function AdminChrome({ benutzer, children }: { benutzer: string; children: ReactNode }) {

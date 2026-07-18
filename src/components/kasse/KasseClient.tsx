@@ -25,6 +25,13 @@ type BelegDTO = {
   positionen: { produktName: string; menge: number; einzelpreisCent: number; summeCent: number }[];
 };
 
+type KonfigDTO = {
+  titel: string;
+  untertitel: string | null;
+  logoUrl: string | null;
+  aktiveVeranstaltung: { id: string; name: string } | null;
+};
+
 export function KasseClient() {
   const { online } = usePwaStatus();
 
@@ -44,6 +51,7 @@ export function KasseClient() {
   const [speichern, setSpeichern] = useState(false);
   const [checkoutFehler, setCheckoutFehler] = useState<string | null>(null);
   const [beleg, setBeleg] = useState<BelegDTO | null>(null);
+  const [konfig, setKonfig] = useState<KonfigDTO | null>(null);
 
   const clientRef = useRef<string>("");
   if (clientRef.current === "") {
@@ -94,6 +102,18 @@ export function KasseClient() {
   useEffect(() => {
     ladeBereiche();
   }, [ladeBereiche]);
+
+  // Header-Konfiguration (Logo, Titel, aktive Veranstaltung) laden.
+  useEffect(() => {
+    let aktiv = true;
+    fetch("/api/konfiguration", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((k) => aktiv && k && setKonfig(k))
+      .catch(() => undefined);
+    return () => {
+      aktiv = false;
+    };
+  }, [online]);
 
   useEffect(() => {
     if (!bereichId) return;
@@ -282,7 +302,24 @@ export function KasseClient() {
     <div className="flex flex-col flex-1 min-h-0">
       {/* Kopfzeile */}
       <header className="shrink-0 border-b border-neutral-800 bg-neutral-900/80 backdrop-blur px-2 sm:px-3 py-2 flex items-center gap-2 flex-wrap">
-        <h1 className="text-base sm:text-lg font-semibold">Kasse</h1>
+        <div className="flex items-center gap-2 min-w-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={konfig?.logoUrl || "/logo.svg"}
+            alt=""
+            className="h-9 w-9 object-contain shrink-0"
+          />
+          <div className="min-w-0 leading-tight">
+            <div className="text-base sm:text-lg font-semibold truncate">
+              {konfig?.titel ?? "Kasse"}
+            </div>
+            {konfig?.aktiveVeranstaltung && (
+              <div className="text-[11px] text-brand-50/80 truncate">
+                {konfig.aktiveVeranstaltung.name}
+              </div>
+            )}
+          </div>
+        </div>
         <select
           value={bereichId ?? ""}
           onChange={(e) => setBereichId(e.target.value || null)}
@@ -359,7 +396,8 @@ export function KasseClient() {
                     key={p.id}
                     produkt={p}
                     menge={warenkorb[p.id]?.menge ?? 0}
-                    onClick={() => hinzufuegen(p)}
+                    onPlus={() => hinzufuegen(p)}
+                    onMinus={() => mengeAendern(p.id, -1)}
                   />
                 ))}
               </div>
@@ -489,41 +527,62 @@ function FilterChip({
 function ProduktKachel({
   produkt,
   menge,
-  onClick,
+  onPlus,
+  onMinus,
 }: {
   produkt: ProduktDTO;
   menge: number;
-  onClick: () => void;
+  onPlus: () => void;
+  onMinus: () => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={`card relative p-3 text-left flex flex-col justify-between min-h-[6.5rem] active:scale-[0.98] transition hover:border-brand-600 ${
-        menge > 0 ? "ring-2 ring-brand-600 border-brand-600" : ""
+    <div
+      className={`card relative p-3 flex flex-col justify-between min-h-[7.5rem] transition ${
+        menge > 0 ? "ring-2 ring-brand-600 border-brand-600" : "hover:border-brand-600"
       }`}
     >
-      {menge > 0 && (
-        <span className="absolute top-2 right-2 badge bg-brand-600 text-white tabular-nums text-sm">
-          {menge}×
+      {/* Hauptfläche: ein Tipp fügt hinzu. */}
+      <button onClick={onPlus} className="text-left active:scale-[0.98] transition">
+        <div className="flex items-start gap-2">
+          {produkt.bildUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={produkt.bildUrl}
+              alt=""
+              className="h-8 w-8 rounded object-cover shrink-0 bg-neutral-800"
+            />
+          ) : produkt.icon ? (
+            <span className="text-2xl leading-none shrink-0">{produkt.icon}</span>
+          ) : null}
+          <span className="font-medium leading-tight">{produkt.name}</span>
+        </div>
+        <span className="mt-2 block text-lg font-semibold tabular-nums text-brand-50">
+          {formatCent(produkt.preisCent)}
         </span>
-      )}
-      <div className="flex items-start gap-2">
-        {produkt.bildUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={produkt.bildUrl}
-            alt=""
-            className="h-8 w-8 rounded object-cover shrink-0 bg-neutral-800"
-          />
-        ) : produkt.icon ? (
-          <span className="text-2xl leading-none shrink-0">{produkt.icon}</span>
-        ) : null}
-        <span className="font-medium leading-tight pr-6">{produkt.name}</span>
+      </button>
+
+      {/* Mengensteuerung direkt in der Kachel (Touch-tauglich). */}
+      <div className="mt-2 flex items-center gap-1">
+        <button
+          onClick={onMinus}
+          disabled={menge === 0}
+          aria-label={`${produkt.name}: Menge verringern`}
+          className="flex-1 h-10 rounded-lg bg-neutral-800 text-xl font-semibold active:bg-neutral-700 disabled:opacity-30"
+        >
+          −
+        </button>
+        <span className="w-9 text-center tabular-nums font-semibold text-lg" aria-live="polite">
+          {menge}
+        </span>
+        <button
+          onClick={onPlus}
+          aria-label={`${produkt.name}: Menge erhöhen`}
+          className="flex-1 h-10 rounded-lg bg-brand-600 text-white text-xl font-semibold active:bg-brand-700"
+        >
+          +
+        </button>
       </div>
-      <span className="mt-2 text-lg font-semibold tabular-nums text-brand-50">
-        {formatCent(produkt.preisCent)}
-      </span>
-    </button>
+    </div>
   );
 }
 
