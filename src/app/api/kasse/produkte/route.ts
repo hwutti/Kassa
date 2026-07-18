@@ -23,14 +23,14 @@ export async function GET(req: Request) {
     // Der Bereich selbst muss existieren und aktiv sein.
     const bereich = await prisma.verkaufsbereich.findFirst({
       where: { id: verkaufsbereichId, aktiv: true },
-      select: { id: true, name: true },
+      select: { id: true, name: true, istAllgemein: true },
     });
     if (!bereich) {
       return fehler("Verkaufsbereich nicht verfügbar", 404);
     }
 
     const produkteRaw = await prisma.produkt.findMany({
-      where: sichtbarkeitWhere(verkaufsbereichId),
+      where: sichtbarkeitWhere(bereich),
       orderBy: [{ sortierung: "asc" }, { name: "asc" }],
       select: {
         id: true,
@@ -38,7 +38,9 @@ export async function GET(req: Request) {
         beschreibung: true,
         preisCent: true,
         kategorieId: true,
-        kategorie: { select: { id: true, name: true, farbe: true, sortierung: true } },
+        icon: true,
+        bildUrl: true,
+        kategorie: { select: { id: true, name: true, farbe: true, icon: true, sortierung: true } },
       },
     });
 
@@ -48,6 +50,8 @@ export async function GET(req: Request) {
       beschreibung: p.beschreibung,
       preisCent: p.preisCent as number, // durch sichtbarkeitWhere garantiert nicht NULL
       kategorieId: p.kategorieId,
+      icon: p.icon,
+      bildUrl: p.bildUrl,
     }));
 
     // Nur Kategorien, die tatsächlich sichtbare Produkte enthalten.
@@ -58,16 +62,17 @@ export async function GET(req: Request) {
           id: p.kategorie.id,
           name: p.kategorie.name,
           farbe: p.kategorie.farbe,
+          icon: p.kategorie.icon,
           sortierung: p.kategorie.sortierung,
         });
       }
     }
     const kategorien: KategorieDTO[] = [...katMap.values()]
       .sort((a, b) => a.sortierung - b.sortierung || a.name.localeCompare(b.name))
-      .map(({ id, name, farbe }) => ({ id, name, farbe }));
+      .map(({ id, name, farbe, icon }) => ({ id, name, farbe, icon }));
 
     const dto: KassenDatenDTO = {
-      verkaufsbereich: bereich,
+      verkaufsbereich: { id: bereich.id, name: bereich.name },
       kategorien,
       produkte,
       stand: new Date().toISOString(),

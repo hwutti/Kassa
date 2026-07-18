@@ -8,9 +8,11 @@ export const dynamic = "force-dynamic";
 const UpdateSchema = z.object({
   name: z.string().trim().min(1).max(150).optional(),
   beschreibung: z.string().trim().max(500).nullable().optional(),
+  icon: z.string().trim().max(40).nullable().optional(),
   // preisCent: null => Preis entfernen ("Preis fehlt" -> verschwindet aus der Kasse).
   preisCent: z.number().int().min(0).nullable().optional(),
   aktiv: z.boolean().optional(),
+  archiviert: z.boolean().optional(),
   sortierung: z.number().int().optional(),
   kategorieId: z.string().min(1).optional(),
   verkaufsbereichIds: z.array(z.string().min(1)).optional(),
@@ -22,14 +24,29 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { id } = await params;
     const daten = UpdateSchema.parse(await req.json());
 
+    // Aktuellen Preis für Änderungserkennung/Historie laden.
+    const vorher = await prisma.produkt.findUnique({
+      where: { id },
+      select: { preisCent: true },
+    });
+    if (!vorher) return fehler("Produkt nicht gefunden", 404);
+
     const data: Prisma.ProduktUpdateInput = {};
     if (daten.name !== undefined) data.name = daten.name;
     if (daten.beschreibung !== undefined) data.beschreibung = daten.beschreibung;
-    if (daten.preisCent !== undefined) data.preisCent = daten.preisCent; // auch null möglich
+    if (daten.icon !== undefined) data.icon = daten.icon;
     if (daten.aktiv !== undefined) data.aktiv = daten.aktiv;
+    if (daten.archiviert !== undefined) data.archiviert = daten.archiviert;
     if (daten.sortierung !== undefined) data.sortierung = daten.sortierung;
     if (daten.kategorieId !== undefined) {
       data.kategorie = { connect: { id: daten.kategorieId } };
+    }
+
+    const preisGeaendert =
+      daten.preisCent !== undefined && daten.preisCent !== vorher.preisCent;
+    if (daten.preisCent !== undefined) {
+      data.preisCent = daten.preisCent; // auch null möglich (Preis entfernen)
+      if (preisGeaendert) data.preisGeaendertAm = new Date();
     }
 
     const produkt = await prisma.$transaction(async (tx) => {
@@ -44,6 +61,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             })),
           });
         }
+      }
+      // Preisänderung protokollieren.
+      if (preisGeaendert) {
+        await tx.preishistorie.create({
+          data: {
+            produktId: id,
+            alterPreisCent: vorher.preisCent,
+            neuerPreisCent: daten.preisCent ?? null,
+          },
+        });
       }
       return tx.produkt.update({ where: { id }, data });
     });

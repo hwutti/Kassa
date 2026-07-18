@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     // 2) Verkaufsbereich muss aktiv sein.
     const bereich = await prisma.verkaufsbereich.findFirst({
       where: { id: daten.verkaufsbereichId, aktiv: true },
-      select: { id: true },
+      select: { id: true, istAllgemein: true },
     });
     if (!bereich) {
       return fehler("Verkaufsbereich nicht verfügbar – Bestellung nicht gespeichert.", 409);
@@ -55,6 +55,7 @@ export async function POST(req: Request) {
     const positionenAufbereitet: {
       produktId: string;
       produktName: string;
+      kategorieName: string;
       einzelpreisCent: number;
       menge: number;
       summeCent: number;
@@ -63,8 +64,8 @@ export async function POST(req: Request) {
 
     for (const pos of daten.positionen) {
       const produkt = await prisma.produkt.findFirst({
-        where: { AND: [{ id: pos.produktId }, sichtbarkeitWhere(daten.verkaufsbereichId)] },
-        select: { id: true, name: true, preisCent: true },
+        where: { AND: [{ id: pos.produktId }, sichtbarkeitWhere(bereich)] },
+        select: { id: true, name: true, preisCent: true, kategorie: { select: { name: true } } },
       });
       if (!produkt) {
         ungueltig.push(pos.produktId);
@@ -75,6 +76,7 @@ export async function POST(req: Request) {
       positionenAufbereitet.push({
         produktId: produkt.id,
         produktName: produkt.name,
+        kategorieName: produkt.kategorie.name,
         einzelpreisCent,
         menge: pos.menge,
         summeCent: einzelpreisCent * pos.menge,

@@ -11,7 +11,7 @@ const NAV = [
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-[100dvh] flex flex-col">
+    <div className="flex-1 min-h-0 flex flex-col">
       <header className="border-b border-neutral-800 bg-neutral-900/80 backdrop-blur">
         <div className="px-3 py-2 flex items-center gap-3">
           <h1 className="text-lg font-semibold">Verwaltung</h1>

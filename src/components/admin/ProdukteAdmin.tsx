@@ -8,6 +8,7 @@ type Produkt = {
   id: string;
   name: string;
   beschreibung: string | null;
+  icon: string | null;
   preisCent: number | null;
   preisFehlt: boolean;
   aktiv: boolean;
@@ -22,7 +23,9 @@ type FormState = {
   id?: string;
   name: string;
   beschreibung: string;
+  icon: string;
   preisText: string; // leer = Preis fehlt
+  sortierung: number;
   aktiv: boolean;
   kategorieId: string;
   verkaufsbereichIds: string[];
@@ -31,7 +34,9 @@ type FormState = {
 const LEER: FormState = {
   name: "",
   beschreibung: "",
+  icon: "",
   preisText: "",
+  sortierung: 0,
   aktiv: true,
   kategorieId: "",
   verkaufsbereichIds: [],
@@ -76,7 +81,9 @@ export function ProdukteAdmin() {
       id: p.id,
       name: p.name,
       beschreibung: p.beschreibung ?? "",
+      icon: p.icon ?? "",
       preisText: p.preisCent === null ? "" : (p.preisCent / 100).toFixed(2).replace(".", ","),
+      sortierung: p.sortierung,
       aktiv: p.aktiv,
       kategorieId: p.kategorie.id,
       verkaufsbereichIds: p.verkaufsbereichIds,
@@ -98,7 +105,9 @@ export function ProdukteAdmin() {
     const body = {
       name: form.name.trim(),
       beschreibung: form.beschreibung.trim() || null,
+      icon: form.icon.trim() || null,
       preisCent,
+      sortierung: form.sortierung,
       aktiv: form.aktiv,
       kategorieId: form.kategorieId,
       verkaufsbereichIds: form.verkaufsbereichIds,
@@ -159,6 +168,7 @@ export function ProdukteAdmin() {
         <div className="space-y-2">
           {sichtbareProdukte.map((p) => (
             <div key={p.id} className="card p-3 flex items-center gap-3">
+              <span className="text-2xl w-8 text-center shrink-0">{p.icon || "📦"}</span>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium">{p.name}</span>
@@ -243,14 +253,25 @@ function ProduktForm({
           {form.id ? "Produkt bearbeiten" : "Neues Produkt"}
         </h2>
 
-        <label className="block">
-          <span className="text-sm text-neutral-400">Name</span>
-          <input
-            className="input mt-1"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-        </label>
+        <div className="flex gap-2">
+          <label className="block w-20">
+            <span className="text-sm text-neutral-400">Icon</span>
+            <input
+              className="input mt-1 text-center text-xl"
+              placeholder="🍺"
+              value={form.icon}
+              onChange={(e) => setForm({ ...form, icon: e.target.value })}
+            />
+          </label>
+          <label className="block flex-1">
+            <span className="text-sm text-neutral-400">Name</span>
+            <input
+              className="input mt-1"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </label>
+        </div>
 
         <label className="block">
           <span className="text-sm text-neutral-400">Beschreibung (optional)</span>
@@ -316,14 +337,25 @@ function ProduktForm({
           </div>
         </div>
 
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={form.aktiv}
-            onChange={(e) => setForm({ ...form, aktiv: e.target.checked })}
-          />
-          <span>Produkt aktiv</span>
-        </label>
+        <div className="flex items-center gap-4">
+          <label className="block w-32">
+            <span className="text-sm text-neutral-400">Sortierung</span>
+            <input
+              type="number"
+              className="input mt-1"
+              value={form.sortierung}
+              onChange={(e) => setForm({ ...form, sortierung: Number(e.target.value) || 0 })}
+            />
+          </label>
+          <label className="flex items-center gap-2 mt-5">
+            <input
+              type="checkbox"
+              checked={form.aktiv}
+              onChange={(e) => setForm({ ...form, aktiv: e.target.checked })}
+            />
+            <span>Produkt aktiv</span>
+          </label>
+        </div>
 
         <div className="flex gap-2 pt-2">
           <button className="btn-ghost flex-1" onClick={onAbbrechen}>

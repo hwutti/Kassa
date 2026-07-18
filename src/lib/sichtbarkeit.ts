@@ -10,18 +10,32 @@ import type { Prisma } from "@prisma/client";
  *   4. das Produkt diesem Verkaufsbereich zugeordnet ist,
  *   5. ein gültiger Verkaufspreis (preisCent >= 0, nicht NULL) hinterlegt ist.
  *
- * Diese Bedingung wird sowohl für die Liste als auch für Suche, Direktaufruf
- * (per ID) und die Bestell-Validierung verwendet – nie darf ein Weg daran vorbei.
+ * Ausnahme (Spec §4): Eine "Allgemeine Kassa" (istAllgemein) zeigt ALLE gültigen,
+ * aktiven Produkte – Bedingung 4 (Zuordnung) entfällt dann.
+ *
+ * Wird für Liste, Suche, Direktaufruf (per ID) und die Bestell-Validierung
+ * verwendet – nie darf ein Weg daran vorbei.
  */
-export function sichtbarkeitWhere(verkaufsbereichId: string): Prisma.ProduktWhereInput {
-  return {
+export function sichtbarkeitWhere(bereich: {
+  id: string;
+  istAllgemein: boolean;
+}): Prisma.ProduktWhereInput {
+  const basis: Prisma.ProduktWhereInput = {
     aktiv: true, // (1)
-    // (5) gültiger Preis: gte 0 schließt automatisch NULL aus (NULL matcht keinen Vergleich).
-    preisCent: { gte: 0 },
+    archiviert: false,
+    preisCent: { gte: 0 }, // (5) gte 0 schließt NULL automatisch aus
     kategorie: { aktiv: true }, // (2)
+  };
+
+  if (bereich.istAllgemein) {
+    return basis;
+  }
+
+  return {
+    ...basis,
     verkaufsbereiche: {
       some: {
-        verkaufsbereichId, // (4)
+        verkaufsbereichId: bereich.id, // (4)
         verkaufsbereich: { aktiv: true }, // (3)
       },
     },

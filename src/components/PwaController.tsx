@@ -101,11 +101,12 @@ export function PwaController() {
 
   return (
     <>
-      {/* Verbindungs-Banner: deutlich sichtbar bei fehlender Verbindung. */}
+      {/* Verbindungs-Banner: deutlich sichtbar bei fehlender Verbindung. Im normalen
+          Fluss ganz oben – verschiebt den Inhalt, statt ihn zu überdecken. */}
       {!online && (
         <div
           role="status"
-          className="fixed inset-x-0 top-0 z-50 bg-red-700 text-white text-center text-sm py-2 px-3 shadow-lg"
+          className="shrink-0 bg-red-700 text-white text-center text-sm py-2 px-3 shadow-lg"
         >
           Keine Verbindung – neue Bestellungen können nicht abgeschlossen werden.
         </div>
@@ -113,7 +114,7 @@ export function PwaController() {
 
       {/* Update-Banner: Aktivierung nur bewusst durch den Benutzer. */}
       {updateReady && (
-        <div className="fixed inset-x-0 bottom-0 z-50 bg-brand-700 text-white px-4 py-3 shadow-lg flex flex-col sm:flex-row items-center justify-center gap-3">
+        <div className="shrink-0 bg-brand-700 text-white px-4 py-2 shadow-lg flex flex-col sm:flex-row items-center justify-center gap-3">
           <span className="text-sm">
             {updateBlockiert
               ? "Bitte zuerst die offene Bestellung abschließen oder verwerfen."
@@ -121,7 +122,7 @@ export function PwaController() {
           </span>
           <button
             onClick={updateKlick}
-            className="rounded-lg bg-white/15 hover:bg-white/25 px-4 py-2 text-sm font-medium min-h-touch"
+            className="rounded-lg bg-white/15 hover:bg-white/25 px-4 py-2 text-sm font-medium"
           >
             Jetzt aktualisieren
           </button>

@@ -7,6 +7,8 @@ export const dynamic = "force-dynamic";
 
 const UpdateSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
+  beschreibung: z.string().trim().max(300).nullable().optional(),
+  icon: z.string().trim().max(40).nullable().optional(),
   aktiv: z.boolean().optional(),
   sortierung: z.number().int().optional(),
   farbe: z.string().trim().max(20).nullable().optional(),

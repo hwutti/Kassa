@@ -20,9 +20,13 @@ export async function GET() {
         id: p.id,
         name: p.name,
         beschreibung: p.beschreibung,
+        icon: p.icon,
+        bildUrl: p.bildUrl,
         preisCent: p.preisCent,
         preisFehlt: !istPreisGueltig(p.preisCent),
+        preisGeaendertAm: p.preisGeaendertAm?.toISOString() ?? null,
         aktiv: p.aktiv,
+        archiviert: p.archiviert,
         sortierung: p.sortierung,
         kategorie: p.kategorie,
         verkaufsbereichIds: p.verkaufsbereiche.map((v) => v.verkaufsbereichId),
@@ -37,6 +41,7 @@ export async function GET() {
 const CreateSchema = z.object({
   name: z.string().trim().min(1).max(150),
   beschreibung: z.string().trim().max(500).nullable().optional(),
+  icon: z.string().trim().max(40).nullable().optional(),
   // preisCent null erlaubt = "Preis fehlt".
   preisCent: z.number().int().min(0).nullable().optional(),
   aktiv: z.boolean().optional(),
@@ -49,11 +54,14 @@ const CreateSchema = z.object({
 export async function POST(req: Request) {
   try {
     const daten = CreateSchema.parse(await req.json());
+    const hatPreis = daten.preisCent !== null && daten.preisCent !== undefined;
     const produkt = await prisma.produkt.create({
       data: {
         name: daten.name,
         beschreibung: daten.beschreibung ?? null,
+        icon: daten.icon ?? null,
         preisCent: daten.preisCent ?? null,
+        preisGeaendertAm: hatPreis ? new Date() : null,
         aktiv: daten.aktiv ?? true,
         sortierung: daten.sortierung ?? 0,
         kategorieId: daten.kategorieId,

@@ -20,10 +20,26 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       return fehler("Parameter 'verkaufsbereich' fehlt", 400);
     }
 
+    const bereich = await prisma.verkaufsbereich.findFirst({
+      where: { id: verkaufsbereichId, aktiv: true },
+      select: { id: true, istAllgemein: true },
+    });
+    if (!bereich) {
+      return fehler("Verkaufsbereich nicht verfügbar", 404);
+    }
+
     const produkt = await prisma.produkt.findFirst({
       // Sichtbarkeitsregel UND ID – ein nicht sichtbares Produkt existiert hier schlicht nicht.
-      where: { AND: [{ id }, sichtbarkeitWhere(verkaufsbereichId)] },
-      select: { id: true, name: true, beschreibung: true, preisCent: true, kategorieId: true },
+      where: { AND: [{ id }, sichtbarkeitWhere(bereich)] },
+      select: {
+        id: true,
+        name: true,
+        beschreibung: true,
+        preisCent: true,
+        kategorieId: true,
+        icon: true,
+        bildUrl: true,
+      },
     });
 
     if (!produkt) {
@@ -37,6 +53,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       beschreibung: produkt.beschreibung,
       preisCent: produkt.preisCent as number,
       kategorieId: produkt.kategorieId,
+      icon: produkt.icon,
+      bildUrl: produkt.bildUrl,
     };
     return ok(dto, { headers: { "Cache-Control": "no-store, must-revalidate" } });
   } catch (e) {

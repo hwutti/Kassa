@@ -1,94 +1,165 @@
 import { PrismaClient } from "@prisma/client";
+import { hashPasswort } from "../src/lib/passwort";
 
 const prisma = new PrismaClient();
 
+// WICHTIG (Spec §7): Verkaufspreise werden NICHT geseedet. Alle Produkte starten
+// ohne Preis ("Preis fehlt") und erhalten ihren Preis ausschließlich im Adminbereich.
+
 async function main() {
-  console.log("Seed: räume bestehende Daten auf …");
+  console.log("Seed: räume bestehende Stammdaten auf …");
   await prisma.bestellPosition.deleteMany();
   await prisma.bestellung.deleteMany();
+  await prisma.preishistorie.deleteMany();
   await prisma.produktVerkaufsbereich.deleteMany();
   await prisma.produkt.deleteMany();
   await prisma.kategorie.deleteMany();
   await prisma.verkaufsbereich.deleteMany();
   await prisma.zaehler.deleteMany();
 
-  // Bestellnummern-Zähler initialisieren.
   await prisma.zaehler.create({ data: { id: "bestellnummer", wert: 0 } });
 
-  // --- Verkaufsbereiche ---
-  const cafeteria = await prisma.verkaufsbereich.create({
-    data: { name: "Cafeteria", aktiv: true, sortierung: 1 },
-  });
-  const kiosk = await prisma.verkaufsbereich.create({
-    data: { name: "Kiosk", aktiv: true, sortierung: 2 },
-  });
-  const sommerfest = await prisma.verkaufsbereich.create({
-    // Inaktiver Bereich: dessen Produkte dürfen in der Kasse nicht erscheinen.
-    data: { name: "Sommerfest (inaktiv)", aktiv: false, sortierung: 3 },
-  });
-
-  // --- Kategorien ---
-  const getraenke = await prisma.kategorie.create({
-    data: { name: "Getränke", aktiv: true, sortierung: 1, farbe: "#2563eb" },
-  });
-  const speisen = await prisma.kategorie.create({
-    data: { name: "Speisen", aktiv: true, sortierung: 2, farbe: "#f59e0b" },
-  });
-  const snacks = await prisma.kategorie.create({
-    data: { name: "Snacks", aktiv: true, sortierung: 3, farbe: "#10b981" },
-  });
-  const saison = await prisma.kategorie.create({
-    // Inaktive Kategorie: deren Produkte dürfen in der Kasse nicht erscheinen.
-    data: { name: "Saison (inaktiv)", aktiv: false, sortierung: 4 },
+  // --- Administrator (Passwort aus Umgebungsvariable, sonst Standard mit Warnung) ---
+  const adminName = process.env.ADMIN_BENUTZER || "admin";
+  const adminPass = process.env.ADMIN_PASSWORT || "kirchtag";
+  if (!process.env.ADMIN_PASSWORT) {
+    console.warn(
+      "⚠  ADMIN_PASSWORT nicht gesetzt – lege Admin mit Standardpasswort 'kirchtag' an. Bitte nach dem ersten Login ändern!",
+    );
+  }
+  await prisma.benutzer.upsert({
+    where: { benutzername: adminName },
+    update: {},
+    create: { benutzername: adminName, passwortHash: hashPasswort(adminPass), rolle: "ADMIN" },
   });
 
-  // Hilfsfunktion: Produkt anlegen und Bereichen zuordnen.
-  async function produkt(opts: {
-    name: string;
-    kategorieId: string;
-    preisCent: number | null;
-    aktiv?: boolean;
-    bereiche: string[];
-    sortierung?: number;
-  }) {
-    const p = await prisma.produkt.create({
+  // --- Verkaufsbereiche (Spec §4) ---
+  const vb = {
+    getraenke: await prisma.verkaufsbereich.create({
+      data: { name: "Getränkeausschank", icon: "🍹", beschreibung: "Alle Getränke", sortierung: 1 },
+    }),
+    bier: await prisma.verkaufsbereich.create({
+      data: { name: "Bier und Radler", icon: "🍺", sortierung: 2 },
+    }),
+    wein: await prisma.verkaufsbereich.create({
+      data: { name: "Wein und Spritzer", icon: "🍷", sortierung: 3 },
+    }),
+    kueche: await prisma.verkaufsbereich.create({
+      data: { name: "Küche und Grill", icon: "🔥", sortierung: 4 },
+    }),
+    kaffee: await prisma.verkaufsbereich.create({
+      data: { name: "Kaffee und Kuchen", icon: "☕", sortierung: 5 },
+    }),
+    schnaps: await prisma.verkaufsbereich.create({
+      data: { name: "Schnaps und Spirituosen", icon: "🥃", sortierung: 6 },
+    }),
+    allgemein: await prisma.verkaufsbereich.create({
       data: {
-        name: opts.name,
-        kategorieId: opts.kategorieId,
-        preisCent: opts.preisCent,
-        aktiv: opts.aktiv ?? true,
-        sortierung: opts.sortierung ?? 0,
+        name: "Allgemeine Kassa",
+        icon: "🧾",
+        beschreibung: "Zeigt alle gültigen, aktiven Produkte",
+        istAllgemein: true,
+        sortierung: 7,
       },
+    }),
+  };
+
+  // --- Kategorien (Spec §5) ---
+  const kat = {
+    bier: await prisma.kategorie.create({
+      data: { name: "Bier und Radler", icon: "🍺", farbe: "#f59e0b", sortierung: 1 },
+    }),
+    wein: await prisma.kategorie.create({
+      data: { name: "Wein und Spritzer", icon: "🍷", farbe: "#b91c1c", sortierung: 2 },
+    }),
+    afrei: await prisma.kategorie.create({
+      data: { name: "Alkoholfreie Getränke", icon: "🥤", farbe: "#2563eb", sortierung: 3 },
+    }),
+    essen: await prisma.kategorie.create({
+      data: { name: "Essen", icon: "🍽️", farbe: "#16a34a", sortierung: 4 },
+    }),
+    kaffee: await prisma.kategorie.create({
+      data: { name: "Kaffee und Kuchen", icon: "☕", farbe: "#92400e", sortierung: 5 },
+    }),
+    schnaps: await prisma.kategorie.create({
+      data: { name: "Schnaps und Spirituosen", icon: "🥃", farbe: "#7c3aed", sortierung: 6 },
+    }),
+  };
+
+  // Hilfsfunktion: Produkt OHNE Preis anlegen und Bereichen zuordnen.
+  let sort = 0;
+  async function p(name: string, kategorieId: string, icon: string, bereiche: string[]) {
+    const prod = await prisma.produkt.create({
+      data: { name, kategorieId, icon, preisCent: null, sortierung: ++sort },
     });
-    for (const b of opts.bereiche) {
+    for (const b of bereiche) {
       await prisma.produktVerkaufsbereich.create({
-        data: { produktId: p.id, verkaufsbereichId: b },
+        data: { produktId: prod.id, verkaufsbereichId: b },
       });
     }
-    return p;
   }
 
-  // --- Sichtbare Produkte (alle Bedingungen erfüllt) ---
-  await produkt({ name: "Kaffee", kategorieId: getraenke.id, preisCent: 250, bereiche: [cafeteria.id, kiosk.id], sortierung: 1 });
-  await produkt({ name: "Mineralwasser 0,5 l", kategorieId: getraenke.id, preisCent: 180, bereiche: [cafeteria.id, kiosk.id], sortierung: 2 });
-  await produkt({ name: "Apfelsaft 0,3 l", kategorieId: getraenke.id, preisCent: 220, bereiche: [cafeteria.id], sortierung: 3 });
-  await produkt({ name: "Leberkässemmel", kategorieId: speisen.id, preisCent: 390, bereiche: [cafeteria.id], sortierung: 1 });
-  await produkt({ name: "Gulaschsuppe", kategorieId: speisen.id, preisCent: 450, bereiche: [cafeteria.id], sortierung: 2 });
-  await produkt({ name: "Schokoriegel", kategorieId: snacks.id, preisCent: 150, bereiche: [cafeteria.id, kiosk.id], sortierung: 1 });
-  await produkt({ name: "Salzstangerl", kategorieId: snacks.id, preisCent: 120, bereiche: [kiosk.id], sortierung: 2 });
-  await produkt({ name: "Gratis-Kostprobe", kategorieId: snacks.id, preisCent: 0, bereiche: [cafeteria.id], sortierung: 3 }); // Preis 0 ist gültig
+  // Bier und Radler
+  await p("Bier klein", kat.bier.id, "🍺", [vb.bier.id, vb.getraenke.id]);
+  await p("Bier groß", kat.bier.id, "🍺", [vb.bier.id, vb.getraenke.id]);
+  await p("Radler klein", kat.bier.id, "🍻", [vb.bier.id, vb.getraenke.id]);
+  await p("Radler groß", kat.bier.id, "🍻", [vb.bier.id, vb.getraenke.id]);
+  await p("Alkoholfreies Bier", kat.bier.id, "🍺", [vb.bier.id, vb.getraenke.id]);
 
-  // --- Produkte, die NICHT in der Kasse erscheinen dürfen (Testfälle) ---
-  // 1) Preis fehlt (preisCent = NULL)
-  await produkt({ name: "Neuer Smoothie (Preis fehlt)", kategorieId: getraenke.id, preisCent: null, bereiche: [cafeteria.id, kiosk.id] });
-  // 2) Produkt inaktiv
-  await produkt({ name: "Eistee (inaktiv)", kategorieId: getraenke.id, preisCent: 200, aktiv: false, bereiche: [cafeteria.id] });
-  // 3) Kategorie inaktiv
-  await produkt({ name: "Glühwein (inaktive Kategorie)", kategorieId: saison.id, preisCent: 350, bereiche: [cafeteria.id] });
-  // 4) Nur im inaktiven Verkaufsbereich zugeordnet
-  await produkt({ name: "Festbier (inaktiver Bereich)", kategorieId: getraenke.id, preisCent: 480, bereiche: [sommerfest.id] });
+  // Wein und Spritzer
+  await p("Weißwein 1/8 Liter", kat.wein.id, "🍷", [vb.wein.id, vb.getraenke.id]);
+  await p("Weißwein 1/4 Liter", kat.wein.id, "🍷", [vb.wein.id, vb.getraenke.id]);
+  await p("Rotwein 1/8 Liter", kat.wein.id, "🍷", [vb.wein.id, vb.getraenke.id]);
+  await p("Rotwein 1/4 Liter", kat.wein.id, "🍷", [vb.wein.id, vb.getraenke.id]);
+  await p("Weißer Spritzer klein", kat.wein.id, "🥂", [vb.wein.id, vb.getraenke.id]);
+  await p("Weißer Spritzer groß", kat.wein.id, "🥂", [vb.wein.id, vb.getraenke.id]);
+  await p("Roter Spritzer klein", kat.wein.id, "🥂", [vb.wein.id, vb.getraenke.id]);
+  await p("Roter Spritzer groß", kat.wein.id, "🥂", [vb.wein.id, vb.getraenke.id]);
+  await p("Sommerspritzer", kat.wein.id, "🥂", [vb.wein.id, vb.getraenke.id]);
 
-  console.log("Seed abgeschlossen.");
+  // Alkoholfreie Getränke
+  await p("Limonade klein", kat.afrei.id, "🥤", [vb.getraenke.id]);
+  await p("Limonade groß", kat.afrei.id, "🥤", [vb.getraenke.id]);
+  await p("Cola klein", kat.afrei.id, "🥤", [vb.getraenke.id]);
+  await p("Cola groß", kat.afrei.id, "🥤", [vb.getraenke.id]);
+  await p("Mineralwasser", kat.afrei.id, "💧", [vb.getraenke.id]);
+  await p("Apfelsaft", kat.afrei.id, "🧃", [vb.getraenke.id]);
+  await p("Apfelsaft gespritzt", kat.afrei.id, "🧃", [vb.getraenke.id]);
+  await p("Orangensaft", kat.afrei.id, "🍊", [vb.getraenke.id]);
+  await p("Kindergetränk", kat.afrei.id, "🧒", [vb.getraenke.id]);
+
+  // Essen
+  await p("Bratwürstel", kat.essen.id, "🌭", [vb.kueche.id]);
+  await p("Bratwürstel mit Brot", kat.essen.id, "🌭", [vb.kueche.id]);
+  await p("Kotelett", kat.essen.id, "🍖", [vb.kueche.id]);
+  await p("Kotelett mit Beilage", kat.essen.id, "🍖", [vb.kueche.id]);
+  await p("Grillteller", kat.essen.id, "🍽️", [vb.kueche.id]);
+  await p("Pommes", kat.essen.id, "🍟", [vb.kueche.id]);
+  await p("Frankfurter", kat.essen.id, "🌭", [vb.kueche.id]);
+  await p("Brot", kat.essen.id, "🍞", [vb.kueche.id]);
+  await p("Portion Senf", kat.essen.id, "🥫", [vb.kueche.id]);
+
+  // Kaffee und Kuchen
+  await p("Kaffee", kat.kaffee.id, "☕", [vb.kaffee.id]);
+  await p("Verlängerter", kat.kaffee.id, "☕", [vb.kaffee.id]);
+  await p("Espresso", kat.kaffee.id, "☕", [vb.kaffee.id]);
+  await p("Cappuccino", kat.kaffee.id, "☕", [vb.kaffee.id]);
+  await p("Tee", kat.kaffee.id, "🍵", [vb.kaffee.id]);
+  await p("Kuchen", kat.kaffee.id, "🍰", [vb.kaffee.id]);
+  await p("Torte", kat.kaffee.id, "🎂", [vb.kaffee.id]);
+  await p("Kaffee und Kuchen", kat.kaffee.id, "☕", [vb.kaffee.id]);
+
+  // Schnaps und Spirituosen
+  await p("Obstler", kat.schnaps.id, "🥃", [vb.schnaps.id]);
+  await p("Williams", kat.schnaps.id, "🥃", [vb.schnaps.id]);
+  await p("Marillenschnaps", kat.schnaps.id, "🥃", [vb.schnaps.id]);
+  await p("Kräuterschnaps", kat.schnaps.id, "🥃", [vb.schnaps.id]);
+  await p("Zirbenschnaps", kat.schnaps.id, "🥃", [vb.schnaps.id]);
+  await p("Likör", kat.schnaps.id, "🍸", [vb.schnaps.id]);
+  await p("Schnapsmischung", kat.schnaps.id, "🥃", [vb.schnaps.id]);
+
+  const anzahl = await prisma.produkt.count();
+  console.log(`Seed abgeschlossen: ${anzahl} Produkte (ohne Preis – bitte im Admin pflegen).`);
 }
 
 main()

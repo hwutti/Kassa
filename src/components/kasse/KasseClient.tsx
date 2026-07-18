@@ -155,10 +155,17 @@ export function KasseClient() {
       return rest;
     });
   }
+  // Stiller Reset (nach erfolgreichem Abschluss).
   function warenkorbLeeren() {
     setWarenkorb({});
     setErhaltenText("");
     setCheckoutFehler(null);
+  }
+  // Leeren per Knopf – mit Sicherheitsabfrage (Spec §24).
+  function leerenMitFrage() {
+    if (artikelAnzahl === 0) return;
+    if (!confirm("Aktuelle Bestellung wirklich leeren?")) return;
+    warenkorbLeeren();
   }
 
   const summe = korbSumme(warenkorb);
@@ -184,9 +191,15 @@ export function KasseClient() {
     }
     if (!bereichId) return;
 
+    const erhaltenCent = parseEuroToCent(erhaltenText);
+    // Zu wenig Bargeld: Abschluss blockieren und fehlenden Betrag anzeigen (Spec §15).
+    if (erhaltenCent !== null && erhaltenCent < summe) {
+      setCheckoutFehler(`Betrag zu niedrig – es fehlen ${formatCent(summe - erhaltenCent)}.`);
+      return;
+    }
+
     setSpeichern(true);
     setCheckoutFehler(null);
-    const erhaltenCent = parseEuroToCent(erhaltenText);
     try {
       const res = await fetch("/api/bestellungen", {
         method: "POST",
@@ -231,14 +244,14 @@ export function KasseClient() {
   const kategorien = daten?.kategorien ?? [];
 
   return (
-    <div className="flex flex-col h-[100dvh]">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Kopfzeile */}
-      <header className="shrink-0 border-b border-neutral-800 bg-neutral-900/80 backdrop-blur px-3 py-2 flex items-center gap-2">
-        <h1 className="text-lg font-semibold mr-1">Kasse</h1>
+      <header className="shrink-0 border-b border-neutral-800 bg-neutral-900/80 backdrop-blur px-2 sm:px-3 py-2 flex items-center gap-2 flex-wrap">
+        <h1 className="text-base sm:text-lg font-semibold">Kasse</h1>
         <select
           value={bereichId ?? ""}
           onChange={(e) => setBereichId(e.target.value || null)}
-          className="input max-w-[14rem] py-1.5"
+          className="input max-w-[11rem] sm:max-w-[14rem] py-1.5 flex-1 min-w-0"
           aria-label="Verkaufsbereich"
         >
           {bereiche.length === 0 && <option value="">Kein aktiver Bereich</option>}
@@ -249,6 +262,7 @@ export function KasseClient() {
           ))}
         </select>
         <div className="ml-auto flex items-center gap-2">
+          <Uhr />
           <span
             className={`badge ${online ? "bg-brand-600/20 text-brand-50" : "bg-red-700/30 text-red-200"}`}
             title={online ? "Verbindung vorhanden" : "Keine Verbindung"}
@@ -256,7 +270,7 @@ export function KasseClient() {
             <span
               className={`mr-1 inline-block h-2 w-2 rounded-full ${online ? "bg-brand-DEFAULT" : "bg-red-500"}`}
             />
-            {online ? "Online" : "Offline"}
+            <span className="hidden sm:inline">{online ? "Online" : "Offline"}</span>
           </span>
           <Link href="/admin" className="btn-ghost py-1.5 text-sm">
             Verwaltung
@@ -332,7 +346,7 @@ export function KasseClient() {
             onErhaltenChange={setErhaltenText}
             onMenge={mengeAendern}
             onEntfernen={entfernen}
-            onLeeren={warenkorbLeeren}
+            onLeeren={leerenMitFrage}
             onAbschliessen={abschliessen}
             speichern={speichern}
             online={online}
@@ -378,7 +392,7 @@ export function KasseClient() {
               onErhaltenChange={setErhaltenText}
               onMenge={mengeAendern}
               onEntfernen={entfernen}
-              onLeeren={warenkorbLeeren}
+              onLeeren={leerenMitFrage}
               onAbschliessen={abschliessen}
               speichern={speichern}
               online={online}
@@ -391,6 +405,23 @@ export function KasseClient() {
       {/* Beleg / Bestätigung */}
       {beleg && <BelegOverlay beleg={beleg} onSchliessen={() => setBeleg(null)} />}
     </div>
+  );
+}
+
+/** Aktuelle Uhrzeit im Kopf (Spec §13). Aktualisiert jede Minute. */
+function Uhr() {
+  const [zeit, setZeit] = useState<string>("");
+  useEffect(() => {
+    const tick = () =>
+      setZeit(new Date().toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" }));
+    tick();
+    const iv = window.setInterval(tick, 15000);
+    return () => window.clearInterval(iv);
+  }, []);
+  return (
+    <span className="hidden sm:inline text-sm tabular-nums text-neutral-400" suppressHydrationWarning>
+      {zeit}
+    </span>
   );
 }
 
@@ -432,14 +463,19 @@ function ProduktKachel({
   return (
     <button
       onClick={onClick}
-      className="card relative p-3 text-left flex flex-col justify-between min-h-[6rem] active:scale-[0.98] transition hover:border-brand-600"
+      className={`card relative p-3 text-left flex flex-col justify-between min-h-[6.5rem] active:scale-[0.98] transition hover:border-brand-600 ${
+        menge > 0 ? "ring-2 ring-brand-600 border-brand-600" : ""
+      }`}
     >
       {menge > 0 && (
-        <span className="absolute top-2 right-2 badge bg-brand-600 text-white tabular-nums">
+        <span className="absolute top-2 right-2 badge bg-brand-600 text-white tabular-nums text-sm">
           {menge}×
         </span>
       )}
-      <span className="font-medium leading-tight pr-8">{produkt.name}</span>
+      <div className="flex items-start gap-2">
+        {produkt.icon && <span className="text-2xl leading-none shrink-0">{produkt.icon}</span>}
+        <span className="font-medium leading-tight pr-6">{produkt.name}</span>
+      </div>
       <span className="mt-2 text-lg font-semibold tabular-nums text-brand-50">
         {formatCent(produkt.preisCent)}
       </span>

@@ -15,7 +15,10 @@ export async function GET() {
       bereiche.map((b) => ({
         id: b.id,
         name: b.name,
+        beschreibung: b.beschreibung,
+        icon: b.icon,
         aktiv: b.aktiv,
+        istAllgemein: b.istAllgemein,
         sortierung: b.sortierung,
         anzahlProdukte: b._count.produkte,
       })),
@@ -28,7 +31,10 @@ export async function GET() {
 
 const CreateSchema = z.object({
   name: z.string().trim().min(1).max(100),
+  beschreibung: z.string().trim().max(300).nullable().optional(),
+  icon: z.string().trim().max(40).nullable().optional(),
   aktiv: z.boolean().optional(),
+  istAllgemein: z.boolean().optional(),
   sortierung: z.number().int().optional(),
 });
 
@@ -39,7 +45,10 @@ export async function POST(req: Request) {
     const bereich = await prisma.verkaufsbereich.create({
       data: {
         name: daten.name,
+        beschreibung: daten.beschreibung ?? null,
+        icon: daten.icon ?? null,
         aktiv: daten.aktiv ?? true,
+        istAllgemein: daten.istAllgemein ?? false,
         sortierung: daten.sortierung ?? 0,
       },
     });

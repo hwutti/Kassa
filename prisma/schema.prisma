@@ -1,5 +1,6 @@
-// POS-Kasse – Datenmodell
-// Geldbeträge werden durchgängig als Integer in Cent gespeichert (keine Float-Rundungsfehler).
+// POS-Kasse – Datenmodell (Kirchtagsfest-Kasse)
+// Geldbeträge werden durchgängig als Integer in Cent gespeichert: exakt, zwei
+// Nachkommastellen, niemals float/double (technisches Äquivalent zu BigDecimal/DECIMAL).
 // Ein fehlender Preis wird durch preisCent = NULL abgebildet ("Preis fehlt").
 
 generator client {
@@ -11,49 +12,59 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Verkaufsbereich (z. B. "Cafeteria", "Kiosk", "Fest"). Produkte werden Bereichen zugeordnet.
+/// Verkaufsbereich (z. B. "Bier und Radler", "Küche und Grill", "Allgemeine Kassa").
 model Verkaufsbereich {
-  id         String   @id @default(cuid())
-  name       String
-  aktiv      Boolean  @default(true)
-  sortierung Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  beschreibung String?
+  icon        String? // Emoji oder Bildpfad
+  aktiv       Boolean  @default(true)
+  // Allgemeine Kassa: zeigt ALLE gültigen/aktiven Produkte, unabhängig von Zuordnung.
+  istAllgemein Boolean @default(false)
+  sortierung  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  produkte    ProduktVerkaufsbereich[]
+  produkte     ProduktVerkaufsbereich[]
   bestellungen Bestellung[]
 }
 
-/// Produktkategorie (z. B. "Getränke", "Speisen").
+/// Produktkategorie (z. B. "Bier und Radler", "Essen").
 model Kategorie {
-  id         String   @id @default(cuid())
-  name       String
-  aktiv      Boolean  @default(true)
-  sortierung Int      @default(0)
-  farbe      String? // optionale Kachelfarbe (Hex), rein kosmetisch
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  beschreibung String?
+  icon        String? // Emoji oder Bildpfad
+  aktiv       Boolean  @default(true)
+  sortierung  Int      @default(0)
+  farbe       String? // optionale Kachelfarbe (Hex)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   produkte Produkt[]
 }
 
 /// Verkaufsprodukt. preisCent = NULL bedeutet "Preis fehlt" -> in der Kasse unsichtbar.
 model Produkt {
-  id          String   @id @default(cuid())
-  name        String
-  beschreibung String?
-  preisCent   Int? // NULL = kein gültiger Preis hinterlegt
-  aktiv       Boolean  @default(true)
-  sortierung  Int      @default(0)
-  bildUrl     String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String
+  beschreibung    String?
+  preisCent       Int? // NULL = kein gültiger Preis hinterlegt
+  aktiv           Boolean  @default(true)
+  archiviert      Boolean  @default(false) // verkaufte Produkte werden archiviert statt gelöscht
+  sortierung      Int      @default(0)
+  bildUrl         String?
+  icon            String? // Emoji als einfache, lizenzfreie Darstellung
+  preisGeaendertAm DateTime? // Zeitpunkt der letzten Preisänderung
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   kategorieId String
   kategorie   Kategorie @relation(fields: [kategorieId], references: [id], onDelete: Restrict)
 
   verkaufsbereiche ProduktVerkaufsbereich[]
   positionen       BestellPosition[]
+  preishistorie    Preishistorie[]
 
   @@index([kategorieId])
 }
@@ -72,15 +83,22 @@ model ProduktVerkaufsbereich {
 
 /// Abgeschlossene Bestellung. Beträge in Cent. Positionen speichern Preis-Snapshot.
 model Bestellung {
-  id           String   @id @default(cuid())
-  nummer       Int      @unique // fortlaufende, eindeutige Bestellnummer
-  status       String   @default("ABGESCHLOSSEN") // ABGESCHLOSSEN | STORNIERT
-  summeCent    Int
-  erhaltenCent Int? // vom Kunden erhaltener Betrag (optional erfasst)
+  id            String   @id @default(cuid())
+  nummer        Int      @unique // fortlaufende, eindeutige Bestellnummer
+  status        String   @default("ABGESCHLOSSEN") // ABGESCHLOSSEN | STORNIERT
+  summeCent     Int
+  erhaltenCent  Int? // vom Kunden erhaltener Betrag (optional erfasst)
   rueckgeldCent Int? // errechnetes Rückgeld
+  zahlungsart   String   @default("BAR")
   // Idempotenzschlüssel des Clients: verhindert doppeltes Speichern derselben Bestellung.
-  clientRef    String   @unique
-  createdAt    DateTime @default(now())
+  clientRef     String   @unique
+  createdAt     DateTime @default(now())
+  abgeschlossenAm DateTime @default(now())
+
+  // Storno (abgeschlossene Bestellungen werden nicht gelöscht, sondern storniert).
+  storniertAm  DateTime?
+  stornoGrund  String?
+  storniertVon String?
 
   verkaufsbereichId String
   verkaufsbereich   Verkaufsbereich @relation(fields: [verkaufsbereichId], references: [id], onDelete: Restrict)
@@ -88,17 +106,19 @@ model Bestellung {
   positionen BestellPosition[]
 
   @@index([createdAt])
+  @@index([status])
 }
 
-/// Einzelposition einer Bestellung mit Preis-Snapshot zum Zeitpunkt des Hinzufügens.
+/// Einzelposition einer Bestellung mit Snapshot von Name, Kategorie und Preis.
 model BestellPosition {
-  id             String @id @default(cuid())
-  bestellungId   String
-  produktId      String
-  produktName    String // Snapshot des Namens
-  einzelpreisCent Int   // Snapshot des Preises
-  menge          Int
-  summeCent      Int // einzelpreisCent * menge
+  id              String @id @default(cuid())
+  bestellungId    String
+  produktId       String
+  produktName     String // Snapshot des Namens zum Verkaufszeitpunkt
+  kategorieName   String @default("") // Snapshot des Kategorienamens
+  einzelpreisCent Int    // Snapshot des Einzelpreises
+  menge           Int
+  summeCent       Int // einzelpreisCent * menge
 
   bestellung Bestellung @relation(fields: [bestellungId], references: [id], onDelete: Cascade)
   produkt    Produkt    @relation(fields: [produktId], references: [id], onDelete: Restrict)
@@ -106,8 +126,34 @@ model BestellPosition {
   @@index([bestellungId])
 }
 
+/// Benutzer/Administrator für den geschützten Administrationsbereich.
+model Benutzer {
+  id            String   @id @default(cuid())
+  benutzername  String   @unique
+  passwortHash  String // scrypt-Hash (Salt:Hash), niemals Klartext
+  rolle         String   @default("ADMIN") // ADMIN | KASSA
+  aktiv         Boolean  @default(true)
+  letzterLogin  DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/// Optionale Preisänderungshistorie.
+model Preishistorie {
+  id            String   @id @default(cuid())
+  produktId     String
+  alterPreisCent Int?
+  neuerPreisCent Int?
+  geaendertVon  String?
+  geaendertAm   DateTime @default(now())
+
+  produkt Produkt @relation(fields: [produktId], references: [id], onDelete: Cascade)
+
+  @@index([produktId])
+}
+
 /// Zähler für fortlaufende Bestellnummern (transaktionssicher hochgezählt).
 model Zaehler {
-  id    String @id
-  wert  Int    @default(0)
+  id   String @id
+  wert Int    @default(0)
 }

@@ -19,6 +19,10 @@ body {
   -webkit-text-size-adjust: 100%;
   /* Kein Doppeltipp-Zoom / bessere Touch-Reaktion. */
   touch-action: manipulation;
+  /* Flex-Spalte: Hinweis-Banner verschieben den Inhalt, statt ihn zu überdecken. */
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Sicheres Ausblenden nativer Tap-Highlights auf Touch-Geräten. */

@@ -15,6 +15,8 @@ export async function GET() {
       kategorien.map((k) => ({
         id: k.id,
         name: k.name,
+        beschreibung: k.beschreibung,
+        icon: k.icon,
         aktiv: k.aktiv,
         sortierung: k.sortierung,
         farbe: k.farbe,
@@ -29,6 +31,8 @@ export async function GET() {
 
 const CreateSchema = z.object({
   name: z.string().trim().min(1).max(100),
+  beschreibung: z.string().trim().max(300).nullable().optional(),
+  icon: z.string().trim().max(40).nullable().optional(),
   aktiv: z.boolean().optional(),
   sortierung: z.number().int().optional(),
   farbe: z.string().trim().max(20).nullable().optional(),
@@ -41,6 +45,8 @@ export async function POST(req: Request) {
     const kategorie = await prisma.kategorie.create({
       data: {
         name: daten.name,
+        beschreibung: daten.beschreibung ?? null,
+        icon: daten.icon ?? null,
         aktiv: daten.aktiv ?? true,
         sortierung: daten.sortierung ?? 0,
         farbe: daten.farbe ?? null,
