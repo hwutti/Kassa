@@ -404,7 +404,7 @@ export function KasseClient() {
                 Keine Produkte {suche ? "für die Suche " : ""}verfügbar.
               </p>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
                 {gefilterteProdukte.map((p) => (
                   <ProduktKachel
                     key={p.id}
@@ -425,7 +425,7 @@ export function KasseClient() {
         </main>
 
         {/* Bestell-Sidebar (ab lg dauerhaft sichtbar) */}
-        <aside className="hidden lg:flex w-96 shrink-0 border-l border-neutral-800 flex-col">
+        <aside className="hidden md:flex w-80 lg:w-96 shrink-0 border-l border-neutral-800 flex-col">
           <BestellPanel
             warenkorb={warenkorb}
             summe={summe}
@@ -443,7 +443,7 @@ export function KasseClient() {
       </div>
 
       {/* Mobile: fixierte Leiste unten mit Gesamtsumme + Warenkorb öffnen */}
-      <div className="lg:hidden shrink-0 border-t border-neutral-800 bg-neutral-900 p-2 flex items-center gap-2">
+      <div className="md:hidden shrink-0 border-t border-neutral-800 bg-neutral-900 p-2 flex items-center gap-2">
         <div className="flex-1">
           <div className="text-xs text-neutral-400">Gesamtsumme</div>
           <div className="text-xl font-semibold tabular-nums">{formatCent(summe)}</div>
@@ -459,7 +459,7 @@ export function KasseClient() {
 
       {/* Mobile: Bottom-Sheet für die Bestellung */}
       {panelOffen && (
-        <div className="lg:hidden fixed inset-0 z-40 flex flex-col">
+        <div className="md:hidden fixed inset-0 z-40 flex flex-col">
           <button
             className="flex-1 bg-black/60"
             aria-label="Schließen"
@@ -662,10 +662,10 @@ function BestellPanel(props: {
       </div>
 
       {/* Summe + Geldrechner + Abschluss */}
-      <div className="shrink-0 border-t border-neutral-800 p-3 space-y-3">
-        <div className="flex items-center justify-between">
+      <div className="shrink-0 border-t border-neutral-800 p-2 sm:p-3 space-y-2">
+        <div className="flex items-baseline justify-between">
           <span className="text-neutral-300">Gesamtsumme</span>
-          <span className="text-2xl font-bold tabular-nums">{formatCent(props.summe)}</span>
+          <span className="text-xl sm:text-2xl font-bold tabular-nums">{formatCent(props.summe)}</span>
         </div>
 
         {!leer && (
