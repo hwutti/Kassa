@@ -137,6 +137,7 @@ model Einstellung {
   untertitel String?
   logoUrl    String?
   logoHoehe  Int      @default(48) // Höhe des Logos im Header in Pixel
+  design     String   @default("dunkel") // Hintergrund-Design (dunkel|glas|aurora|modern|cool|mitternacht)
   updatedAt  DateTime @updatedAt
 }
 

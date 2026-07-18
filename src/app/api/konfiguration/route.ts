@@ -19,6 +19,7 @@ export async function GET() {
         untertitel: e.untertitel,
         logoUrl: e.logoUrl,
         logoHoehe: e.logoHoehe,
+        design: e.design,
         aktiveVeranstaltung: veranstaltung,
       },
       { headers: { "Cache-Control": "no-store" } },

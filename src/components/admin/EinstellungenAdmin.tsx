@@ -3,13 +3,29 @@
 import { useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 
-type Konfig = { titel: string; untertitel: string | null; logoUrl: string | null; logoHoehe: number };
+type Konfig = {
+  titel: string;
+  untertitel: string | null;
+  logoUrl: string | null;
+  logoHoehe: number;
+  design: string;
+};
+
+const DESIGNS: { id: string; name: string; vorschau: string }[] = [
+  { id: "dunkel", name: "Standard", vorschau: "#0a0a0a" },
+  { id: "glas", name: "Glas", vorschau: "linear-gradient(135deg, rgba(56,189,248,.5), rgba(168,85,247,.5)), #0b1220" },
+  { id: "aurora", name: "Aurora", vorschau: "radial-gradient(circle at 20% 20%, rgba(16,185,129,.8), transparent 60%), radial-gradient(circle at 80% 30%, rgba(59,130,246,.7), transparent 60%), #060913" },
+  { id: "modern", name: "Modern", vorschau: "linear-gradient(160deg, #1f2a44, #0a0a0a)" },
+  { id: "cool", name: "Cool", vorschau: "radial-gradient(circle at 90% 10%, rgba(34,211,238,.7), transparent 55%), #08111f" },
+  { id: "mitternacht", name: "Mitternacht", vorschau: "radial-gradient(circle at 50% 0%, #1b2a6b, #05060a 65%)" },
+];
 
 export function EinstellungenAdmin() {
   const [titel, setTitel] = useState("");
   const [untertitel, setUntertitel] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoHoehe, setLogoHoehe] = useState(48);
+  const [design, setDesign] = useState("dunkel");
   const [fehler, setFehler] = useState<string | null>(null);
   const [gespeichert, setGespeichert] = useState(false);
   const [ladeBild, setLadeBild] = useState(false);
@@ -21,9 +37,16 @@ export function EinstellungenAdmin() {
         setUntertitel(k.untertitel ?? "");
         setLogoUrl(k.logoUrl);
         setLogoHoehe(k.logoHoehe ?? 48);
+        setDesign(k.design ?? "dunkel");
       })
       .catch((e) => setFehler((e as Error).message));
   }, []);
+
+  // Design live anwenden (Vorschau für den ganzen Adminbereich).
+  function designWaehlen(d: string) {
+    setDesign(d);
+    document.documentElement.dataset.design = d;
+  }
 
   async function bildHochladen(datei: File) {
     setLadeBild(true);
@@ -52,8 +75,14 @@ export function EinstellungenAdmin() {
           untertitel: untertitel.trim() || null,
           logoUrl,
           logoHoehe,
+          design,
         }),
       });
+      try {
+        window.localStorage.setItem("pos-kasse:design", design);
+      } catch {
+        /* ignorieren */
+      }
       setGespeichert(true);
       setTimeout(() => setGespeichert(false), 2500);
     } catch (e) {
@@ -121,6 +150,34 @@ export function EinstellungenAdmin() {
           )}
         </div>
         {ladeBild && <p className="text-xs text-neutral-400 mt-1">Lädt Logo hoch …</p>}
+      </div>
+
+      {/* Hintergrund-Design */}
+      <div>
+        <span className="text-sm text-neutral-400">Hintergrund-Design</span>
+        <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {DESIGNS.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => designWaehlen(d.id)}
+              className={`rounded-xl border p-2 text-left transition ${
+                design === d.id
+                  ? "border-brand-600 ring-2 ring-brand-600"
+                  : "border-neutral-700 hover:border-neutral-500"
+              }`}
+            >
+              <span
+                className="block h-12 w-full rounded-lg border border-white/10"
+                style={{ background: d.vorschau }}
+              />
+              <span className="mt-1 block text-sm">{d.name}</span>
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-neutral-500 mt-1">
+          Vorschau wird sofort angewendet. Erst mit „Speichern" dauerhaft übernommen.
+        </p>
       </div>
 
       <label className="block">

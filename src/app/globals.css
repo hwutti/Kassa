@@ -58,3 +58,87 @@ body {
     @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
   }
 }
+
+/* ============================================================================
+   Vordefinierte Hintergrund-Designs (umschaltbar in den Einstellungen).
+   Attribut data-design steht auf <html>.
+   ============================================================================ */
+
+/* --- Glas (Glasmorphismus) --- */
+[data-design="glas"] body {
+  background:
+    radial-gradient(1200px 600px at 8% -10%, rgba(56, 189, 248, 0.14), transparent 60%),
+    radial-gradient(1000px 500px at 110% 8%, rgba(168, 85, 247, 0.14), transparent 60%),
+    linear-gradient(180deg, #0b1220, #0a0a0a);
+  background-attachment: fixed;
+}
+[data-design="glas"] .card,
+[data-design="glas"] header {
+  background: rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+[data-design="glas"] .input {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* --- Aurora --- */
+[data-design="aurora"] body {
+  background:
+    radial-gradient(900px 620px at 15% 0%, rgba(16, 185, 129, 0.24), transparent 55%),
+    radial-gradient(820px 600px at 88% 8%, rgba(59, 130, 246, 0.22), transparent 55%),
+    radial-gradient(760px 560px at 50% 105%, rgba(168, 85, 247, 0.2), transparent 55%),
+    #060913;
+  background-attachment: fixed;
+  background-size: 200% 200%;
+  animation: aurora-move 24s ease-in-out infinite;
+}
+[data-design="aurora"] .card {
+  background: rgba(10, 14, 26, 0.72);
+  backdrop-filter: blur(6px);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+@keyframes aurora-move {
+  0%, 100% { background-position: 0% 0%, 100% 0%, 50% 100%, 0 0; }
+  50% { background-position: 20% 10%, 80% 20%, 40% 90%, 0 0; }
+}
+
+/* --- Modern --- */
+[data-design="modern"] body {
+  background: linear-gradient(160deg, #0f172a 0%, #0a0a0a 62%);
+  background-attachment: fixed;
+}
+[data-design="modern"] .card {
+  background: #12161f;
+  border-color: #1f2633;
+}
+
+/* --- Cool --- */
+[data-design="cool"] body {
+  background:
+    radial-gradient(1000px 700px at 100% 0%, rgba(34, 211, 238, 0.16), transparent 55%),
+    linear-gradient(180deg, #08111f, #0a0a0a);
+  background-attachment: fixed;
+}
+[data-design="cool"] .card {
+  background: rgba(15, 23, 42, 0.72);
+  border-color: rgba(34, 211, 238, 0.16);
+}
+
+/* --- Mitternacht --- */
+[data-design="mitternacht"] body {
+  background: radial-gradient(1200px 820px at 50% -20%, #101a3a, #05060a 62%);
+  background-attachment: fixed;
+}
+[data-design="mitternacht"] .card {
+  background: #0b1024;
+  border-color: #1b2450;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-design="aurora"] body {
+    animation: none;
+  }
+}
