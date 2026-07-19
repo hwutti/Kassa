@@ -804,7 +804,7 @@ function BezahlModal(props: {
                 ? "Speichere …"
                 : !props.online
                   ? "Offline – gesperrt"
-                  : "Bezahlen"}
+                  : "Bezahlt"}
             </button>
           </div>
         </div>
