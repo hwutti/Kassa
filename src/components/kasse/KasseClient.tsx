@@ -10,6 +10,7 @@ import {
   anzahlArtikel,
   summeCent as korbSumme,
   type Warenkorb,
+  type WarenkorbPosition,
 } from "@/components/kasse/types";
 import { Geldrechner } from "@/components/kasse/Geldrechner";
 import { parseEuroToCent } from "@/lib/money";
@@ -52,6 +53,7 @@ export function KasseClient() {
   const [warenkorb, setWarenkorb] = useState<Warenkorb>({});
   const [erhaltenText, setErhaltenText] = useState("");
   const [panelOffen, setPanelOffen] = useState(false);
+  const [bezahlOffen, setBezahlOffen] = useState(false); // Bezahl-/Übersicht-Modal
 
   const [speichern, setSpeichern] = useState(false);
   const [checkoutFehler, setCheckoutFehler] = useState<string | null>(null);
@@ -239,6 +241,13 @@ export function KasseClient() {
   const summe = korbSumme(warenkorb);
   const artikelAnzahl = anzahlArtikel(warenkorb);
 
+  // "Kassieren" öffnet zunächst das Bezahl-/Übersichts-Modal (noch nicht speichern).
+  function kassierenOeffnen() {
+    if (artikelAnzahl === 0) return;
+    setCheckoutFehler(null);
+    setBezahlOffen(true);
+  }
+
   const gefilterteProdukte = useMemo(() => {
     if (!daten) return [];
     const q = suche.trim().toLowerCase();
@@ -301,6 +310,7 @@ export function KasseClient() {
           : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       warenkorbLeeren();
       setPanelOffen(false);
+      setBezahlOffen(false);
       // Katalog auffrischen (Preise könnten sich geändert haben).
       if (bereichId) ladeDaten(bereichId, false);
     } catch {
@@ -436,10 +446,7 @@ export function KasseClient() {
             onMenge={mengeAendern}
             onEntfernen={entfernen}
             onLeeren={leerenMitFrage}
-            onAbschliessen={abschliessen}
-            speichern={speichern}
-            online={online}
-            checkoutFehler={checkoutFehler}
+            onKassieren={kassierenOeffnen}
           />
         </aside>
       </div>
@@ -482,13 +489,24 @@ export function KasseClient() {
               onMenge={mengeAendern}
               onEntfernen={entfernen}
               onLeeren={leerenMitFrage}
-              onAbschliessen={abschliessen}
-              speichern={speichern}
-              online={online}
-              checkoutFehler={checkoutFehler}
+              onKassieren={kassierenOeffnen}
             />
           </div>
         </div>
+      )}
+
+      {/* Bezahl-/Übersichts-Modal (öffnet mit „Kassieren", speichert erst bei „Bezahlen") */}
+      {bezahlOffen && !beleg && (
+        <BezahlModal
+          positionen={Object.values(warenkorb)}
+          summe={summe}
+          erhaltenText={erhaltenText}
+          online={online}
+          speichern={speichern}
+          fehler={checkoutFehler}
+          onAbbrechen={() => setBezahlOffen(false)}
+          onBezahlen={abschliessen}
+        />
       )}
 
       {/* Beleg / Bestätigung */}
@@ -622,10 +640,7 @@ function BestellPanel(props: {
   onMenge: (id: string, delta: number) => void;
   onEntfernen: (id: string) => void;
   onLeeren: () => void;
-  onAbschliessen: () => void;
-  speichern: boolean;
-  online: boolean;
-  checkoutFehler: string | null;
+  onKassieren: () => void;
 }) {
   const positionen = Object.values(props.warenkorb);
   const leer = positionen.length === 0;
@@ -693,27 +708,105 @@ function BestellPanel(props: {
           <span className="text-xl sm:text-2xl font-bold tabular-nums">{formatCent(props.summe)}</span>
         </div>
 
-        {props.checkoutFehler && (
-          <p role="alert" className="text-sm text-red-300 bg-red-950/50 rounded-lg px-3 py-2">
-            {props.checkoutFehler}
-          </p>
-        )}
-
         <div className="flex gap-2">
-          <button className="btn-ghost" onClick={props.onLeeren} disabled={leer || props.speichern}>
+          <button className="btn-ghost" onClick={props.onLeeren} disabled={leer}>
             Leeren
           </button>
-          <button
-            className="btn-primary flex-1"
-            onClick={props.onAbschliessen}
-            disabled={leer || props.speichern || !props.online}
-          >
-            {props.speichern
-              ? "Speichere …"
-              : !props.online
-                ? "Offline – gesperrt"
-                : "Kassieren"}
+          <button className="btn-primary flex-1" onClick={props.onKassieren} disabled={leer}>
+            Kassieren
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Bezahl-/Übersichts-Modal. Öffnet sich mit „Kassieren" und zeigt die komplette
+ * Bestellung übersichtlich. Erst „Bezahlen" speichert (danach „Bestellung gespeichert").
+ */
+function BezahlModal(props: {
+  positionen: WarenkorbPosition[];
+  summe: number;
+  erhaltenText: string;
+  online: boolean;
+  speichern: boolean;
+  fehler: string | null;
+  onAbbrechen: () => void;
+  onBezahlen: () => void;
+}) {
+  const erhaltenCent = parseEuroToCent(props.erhaltenText);
+  const rueckgeldCent =
+    erhaltenCent !== null && erhaltenCent >= props.summe ? erhaltenCent - props.summe : null;
+  const zuWenig = erhaltenCent !== null && erhaltenCent < props.summe;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="card w-full max-w-md max-h-[92dvh] flex flex-col">
+        <div className="shrink-0 p-4 border-b border-neutral-800">
+          <h2 className="text-lg font-semibold">Bestellung – Übersicht</h2>
+          <p className="text-sm text-neutral-400">Bitte prüfen und bezahlen.</p>
+        </div>
+
+        {/* Positionen */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-1.5 min-h-0">
+          {props.positionen.map((p) => (
+            <div key={p.produktId} className="flex justify-between gap-2 tabular-nums">
+              <span className="min-w-0">
+                <span className="font-medium">{p.menge}×</span> {p.name}
+                <span className="text-neutral-500 text-sm"> ({formatCent(p.einzelpreisCent)})</span>
+              </span>
+              <span className="shrink-0">{formatCent(p.einzelpreisCent * p.menge)}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Summe + Geld */}
+        <div className="shrink-0 border-t border-neutral-800 p-4 space-y-2">
+          <div className="flex justify-between items-baseline">
+            <span className="text-neutral-300">Gesamtsumme</span>
+            <span className="text-2xl font-bold tabular-nums">{formatCent(props.summe)}</span>
+          </div>
+          {erhaltenCent !== null && (
+            <div className="flex justify-between text-sm text-neutral-400 tabular-nums">
+              <span>Erhalten</span>
+              <span>{formatCent(erhaltenCent)}</span>
+            </div>
+          )}
+          {rueckgeldCent !== null && (
+            <div className="flex justify-between text-lg font-semibold text-brand-50 tabular-nums">
+              <span>Rückgeld</span>
+              <span>{formatCent(rueckgeldCent)}</span>
+            </div>
+          )}
+          {zuWenig && (
+            <p className="text-sm text-amber-300">
+              Betrag zu niedrig – es fehlen {formatCent(props.summe - (erhaltenCent ?? 0))}.
+            </p>
+          )}
+
+          {props.fehler && (
+            <p role="alert" className="text-sm text-red-300 bg-red-950/50 rounded-lg px-3 py-2">
+              {props.fehler}
+            </p>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button className="btn-ghost flex-1" onClick={props.onAbbrechen} disabled={props.speichern}>
+              Ändern
+            </button>
+            <button
+              className="btn-primary flex-1"
+              onClick={props.onBezahlen}
+              disabled={props.speichern || !props.online}
+            >
+              {props.speichern
+                ? "Speichere …"
+                : !props.online
+                  ? "Offline – gesperrt"
+                  : "Bezahlen"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
