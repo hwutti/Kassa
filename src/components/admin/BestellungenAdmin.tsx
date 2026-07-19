@@ -17,19 +17,25 @@ type Bestellung = {
   stornoGrund: string | null;
   storniertVon: string | null;
   verkaufsbereichName: string;
+  veranstaltungName: string | null;
   positionen: { produktName: string; menge: number; summeCent: number }[];
 };
+type Veranstaltung = { id: string; name: string; aktiv: boolean };
 
 export function BestellungenAdmin() {
   const dialog = useDialog();
   const [liste, setListe] = useState<Bestellung[]>([]);
+  const [veranstaltungen, setVeranstaltungen] = useState<Veranstaltung[]>([]);
+  const [filter, setFilter] = useState<string | undefined>(undefined); // undefined = noch nicht initialisiert
   const [ladt, setLadt] = useState(true);
   const [fehler, setFehler] = useState<string | null>(null);
   const [nurAktive, setNurAktive] = useState(false);
 
-  async function laden() {
+  async function laden(veranstaltungId: string) {
+    setLadt(true);
     try {
-      setListe(await jsonFetch<Bestellung[]>("/api/admin/bestellungen?limit=200"));
+      const q = veranstaltungId ? `&veranstaltung=${veranstaltungId}` : "";
+      setListe(await jsonFetch<Bestellung[]>(`/api/admin/bestellungen?limit=200${q}`));
       setFehler(null);
     } catch (e) {
       setFehler((e as Error).message);
@@ -37,9 +43,22 @@ export function BestellungenAdmin() {
       setLadt(false);
     }
   }
+
+  // Veranstaltungen laden, Filter auf die aktive Veranstaltung vorbelegen.
   useEffect(() => {
-    laden();
+    jsonFetch<Veranstaltung[]>("/api/admin/veranstaltungen")
+      .then((vs) => {
+        setVeranstaltungen(vs);
+        setFilter(vs.find((v) => v.aktiv)?.id ?? "");
+      })
+      .catch(() => setFilter(""));
   }, []);
+
+  // Bei Filteränderung neu laden.
+  useEffect(() => {
+    if (filter === undefined) return;
+    laden(filter);
+  }, [filter]);
 
   async function stornieren(b: Bestellung) {
     const grund = await dialog.prompt({
@@ -59,26 +78,44 @@ export function BestellungenAdmin() {
         method: "POST",
         body: JSON.stringify({ grund: grund.trim() }),
       });
-      laden();
+      laden(filter ?? "");
     } catch (e) {
       await dialog.alert({ titel: "Fehler", text: (e as Error).message });
     }
   }
-
-  if (ladt) return <p className="text-neutral-400">Lädt …</p>;
-  if (fehler) return <p className="text-red-300">{fehler}</p>;
 
   const sichtbar = nurAktive ? liste.filter((b) => b.status !== "STORNIERT") : liste;
   const anzahlStorno = liste.filter((b) => b.status === "STORNIERT").length;
 
   return (
     <div className="space-y-3">
-      <label className="flex items-center gap-2 text-sm text-neutral-300">
-        <input type="checkbox" checked={nurAktive} onChange={(e) => setNurAktive(e.target.checked)} />
-        Stornierte ausblenden ({anzahlStorno})
-      </label>
+      {/* Filter nach Veranstaltung */}
+      <div className="card p-3 flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2">
+          <span className="text-sm text-neutral-400">Veranstaltung</span>
+          <select
+            className="input py-1.5 w-auto"
+            value={filter ?? ""}
+            onChange={(e) => setFilter(e.target.value)}
+          >
+            <option value="">Alle Veranstaltungen</option>
+            {veranstaltungen.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+                {v.aktiv ? " (aktiv)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-sm text-neutral-300 ml-auto">
+          <input type="checkbox" checked={nurAktive} onChange={(e) => setNurAktive(e.target.checked)} />
+          Stornierte ausblenden ({anzahlStorno})
+        </label>
+      </div>
 
-      {sichtbar.length === 0 && <p className="text-neutral-400">Keine Bestellungen.</p>}
+      {ladt && <p className="text-neutral-400">Lädt …</p>}
+      {fehler && <p className="text-red-300">{fehler}</p>}
+      {!ladt && sichtbar.length === 0 && <p className="text-neutral-400">Keine Bestellungen.</p>}
 
       {sichtbar.map((b) => {
         const storniert = b.status === "STORNIERT";
@@ -89,6 +126,7 @@ export function BestellungenAdmin() {
               {storniert && <span className="badge bg-red-700/30 text-red-200">storniert</span>}
               <span className="text-xs text-neutral-400">
                 {new Date(b.createdAt).toLocaleString("de-AT")} · {b.verkaufsbereichName}
+                {b.veranstaltungName ? ` · ${b.veranstaltungName}` : ""}
               </span>
               <span className={`ml-auto font-semibold tabular-nums ${storniert ? "line-through" : ""}`}>
                 {formatCent(b.summeCent)}

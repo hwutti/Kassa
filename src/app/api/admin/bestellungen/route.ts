@@ -8,10 +8,16 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const limit = Math.min(Number(url.searchParams.get("limit") ?? 100) || 100, 500);
+    const veranstaltungId = url.searchParams.get("veranstaltung");
     const bestellungen = await prisma.bestellung.findMany({
+      where: veranstaltungId ? { veranstaltungId } : undefined,
       orderBy: { createdAt: "desc" },
       take: limit,
-      include: { positionen: true, verkaufsbereich: { select: { name: true } } },
+      include: {
+        positionen: true,
+        verkaufsbereich: { select: { name: true } },
+        veranstaltung: { select: { name: true } },
+      },
     });
     return ok(
       bestellungen.map((b) => ({
@@ -26,6 +32,7 @@ export async function GET(req: Request) {
         stornoGrund: b.stornoGrund,
         storniertVon: b.storniertVon,
         verkaufsbereichName: b.verkaufsbereich.name,
+        veranstaltungName: b.veranstaltung?.name ?? null,
         positionen: b.positionen.map((p) => ({
           produktName: p.produktName,
           kategorieName: p.kategorieName,
