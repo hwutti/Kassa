@@ -63,6 +63,7 @@ model Produkt {
   kategorie   Kategorie @relation(fields: [kategorieId], references: [id], onDelete: Restrict)
 
   verkaufsbereiche ProduktVerkaufsbereich[]
+  arbeitsbereiche  ProduktArbeitsbereich[]
   positionen       BestellPosition[]
   preishistorie    Preishistorie[]
 
@@ -85,14 +86,27 @@ model ProduktVerkaufsbereich {
 model Bestellung {
   id            String   @id @default(cuid())
   nummer        Int      @unique // fortlaufende, eindeutige Bestellnummer
-  status        String   @default("ABGESCHLOSSEN") // ABGESCHLOSSEN | STORNIERT
+  // Grober Alt-/Gesamtstatus (Rückwärtskompatibilität): OFFEN | ABGESCHLOSSEN | STORNIERT
+  status        String   @default("ABGESCHLOSSEN")
+  // Getrennte Status (Mehrbenutzer-Ausbau):
+  bestellStatus     String @default("COMPLETED")  // DRAFT|SUBMITTED|IN_PROGRESS|READY_FOR_PICKUP|COLLECTED|DELIVERED|COMPLETED|CANCELLED
+  zahlungStatus     String @default("PAID")       // UNPAID|PAYMENT_PENDING|PAID|PARTIALLY_REFUNDED|REFUNDED|PAYMENT_CANCELLED
+  auslieferungStatus String @default("DELIVERED") // NOT_READY|READY_FOR_PICKUP|COLLECTED|DELIVERED
+  version       Int      @default(0) // optimistisches Locking
   summeCent     Int
   erhaltenCent  Int? // vom Kunden erhaltener Betrag (optional erfasst)
   rueckgeldCent Int? // errechnetes Rückgeld
   zahlungsart   String   @default("BAR")
+  // Kellner-/Tischangaben (nur beim Kellner-Ablauf gesetzt).
+  kellnerId     String?
+  tisch         String?
+  gast          String?
+  abholnummer   String?
+  notiz         String?
   // Idempotenzschlüssel des Clients: verhindert doppeltes Speichern derselben Bestellung.
   clientRef     String   @unique
   createdAt     DateTime @default(now())
+  abgesendetAm  DateTime?
   abgeschlossenAm DateTime @default(now())
 
   // Storno (abgeschlossene Bestellungen werden nicht gelöscht, sondern storniert).
@@ -103,15 +117,21 @@ model Bestellung {
   verkaufsbereichId String
   verkaufsbereich   Verkaufsbereich @relation(fields: [verkaufsbereichId], references: [id], onDelete: Restrict)
 
+  kellner Benutzer? @relation("KellnerBestellungen", fields: [kellnerId], references: [id], onDelete: SetNull)
+
   // Zuordnung zur Veranstaltung (für getrennte Abrechnungen). NULL = keine.
   veranstaltungId String?
   veranstaltung   Veranstaltung? @relation(fields: [veranstaltungId], references: [id], onDelete: SetNull)
 
   positionen BestellPosition[]
+  tickets    Bereichsticket[]
+  zahlungen  Zahlung[]
 
   @@index([createdAt])
   @@index([status])
+  @@index([bestellStatus])
   @@index([veranstaltungId])
+  @@index([kellnerId])
 }
 
 /// Veranstaltung (z. B. "Kirchtag 2026"). Abrechnungen werden je Veranstaltung getrennt.
@@ -149,6 +169,10 @@ model BestellPosition {
   produktName        String // Snapshot des Namens zum Verkaufszeitpunkt
   kategorieName      String @default("") // Snapshot des Kategorienamens
   verkaufsbereichName String @default("") // Snapshot des Verkaufsbereichs (positionsgenaue Abrechnung)
+  arbeitsbereich     String @default("") // Snapshot des zuständigen Arbeitsbereichs (Küche/Bier/…)
+  arbeitsbereichId   String? // für Ticket-Gruppierung
+  notiz              String?
+  status             String @default("DELIVERED") // QUEUED|IN_PREPARATION|READY|COLLECTED|DELIVERED|CANCELLED
   einzelpreisCent    Int    // Snapshot des Einzelpreises
   menge           Int
   summeCent       Int // einzelpreisCent * menge
@@ -157,18 +181,25 @@ model BestellPosition {
   produkt    Produkt    @relation(fields: [produktId], references: [id], onDelete: Restrict)
 
   @@index([bestellungId])
+  @@index([arbeitsbereichId])
 }
 
 /// Benutzer/Administrator für den geschützten Administrationsbereich.
 model Benutzer {
   id            String   @id @default(cuid())
   benutzername  String   @unique
+  anzeigename   String?
   passwortHash  String // scrypt-Hash (Salt:Hash), niemals Klartext
-  rolle         String   @default("ADMIN") // ADMIN | KASSA
+  rolle         String   @default("ADMIN") // ADMIN | KELLNER | BEREICH | KASSA | SUPERVISOR
+  darfZahlen    Boolean  @default(false)
+  darfStornieren Boolean @default(false)
   aktiv         Boolean  @default(true)
   letzterLogin  DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  arbeitsbereiche BenutzerArbeitsbereich[]
+  bestellungen    Bestellung[] @relation("KellnerBestellungen")
 }
 
 /// Optionale Preisänderungshistorie.
@@ -189,4 +220,104 @@ model Preishistorie {
 model Zaehler {
   id   String @id
   wert Int    @default(0)
+}
+
+/// Arbeitsbereich = Ausgabe-/Zubereitungsstelle (Küche, Bierausgabe, …).
+/// Produkte werden hierhin zur Bearbeitung geroutet.
+model Arbeitsbereich {
+  id          String   @id @default(cuid())
+  name        String
+  beschreibung String?
+  icon        String?
+  aktiv       Boolean  @default(true)
+  sortierung  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  produkte    ProduktArbeitsbereich[]
+  mitarbeiter BenutzerArbeitsbereich[]
+  tickets     Bereichsticket[]
+}
+
+/// Zuordnung Produkt <-> Arbeitsbereich (n:m). Konfigurierbar, nicht im Code fixiert.
+model ProduktArbeitsbereich {
+  produktId        String
+  arbeitsbereichId String
+  primaer          Boolean @default(true)
+  aktiv            Boolean @default(true)
+  sortierung       Int     @default(0)
+
+  produkt        Produkt        @relation(fields: [produktId], references: [id], onDelete: Cascade)
+  arbeitsbereich Arbeitsbereich @relation(fields: [arbeitsbereichId], references: [id], onDelete: Cascade)
+
+  @@id([produktId, arbeitsbereichId])
+  @@index([arbeitsbereichId])
+}
+
+/// Zuordnung Benutzer (Bereichsmitarbeiter) <-> Arbeitsbereich (n:m).
+model BenutzerArbeitsbereich {
+  benutzerId       String
+  arbeitsbereichId String
+
+  benutzer       Benutzer       @relation(fields: [benutzerId], references: [id], onDelete: Cascade)
+  arbeitsbereich Arbeitsbereich @relation(fields: [arbeitsbereichId], references: [id], onDelete: Cascade)
+
+  @@id([benutzerId, arbeitsbereichId])
+  @@index([arbeitsbereichId])
+}
+
+/// Bearbeitungsticket eines Arbeitsbereichs für eine Bestellung.
+model Bereichsticket {
+  id               String   @id @default(cuid())
+  bestellungId     String
+  arbeitsbereichId String
+  status           String   @default("QUEUED") // QUEUED|ACCEPTED|IN_PREPARATION|READY|COLLECTED|CANCELLED
+  version          Int      @default(0)
+  bearbeiterId     String?
+  createdAt        DateTime @default(now())
+  angenommenAm     DateTime?
+  fertigAm         DateTime?
+  abgeholtAm       DateTime?
+
+  bestellung     Bestellung     @relation(fields: [bestellungId], references: [id], onDelete: Cascade)
+  arbeitsbereich Arbeitsbereich @relation(fields: [arbeitsbereichId], references: [id], onDelete: Restrict)
+
+  @@index([bestellungId])
+  @@index([arbeitsbereichId])
+  @@index([status])
+}
+
+/// Zahlung zu einer Bestellung (getrennt von Zubereitung/Auslieferung).
+model Zahlung {
+  id           String   @id @default(cuid())
+  bestellungId String
+  art          String   @default("BAR")
+  betragCent   Int
+  gegebenCent  Int?
+  rueckgeldCent Int?
+  status       String   @default("PAID") // PAID|REFUNDED|PAYMENT_CANCELLED
+  benutzerId   String?
+  zeitpunkt    DateTime @default(now())
+
+  bestellung Bestellung @relation(fields: [bestellungId], references: [id], onDelete: Cascade)
+
+  @@index([bestellungId])
+}
+
+/// Nachvollziehbares Audit-Protokoll wichtiger Aktionen.
+model AuditEreignis {
+  id           String   @id @default(cuid())
+  bestellungId String?
+  positionId   String?
+  ticketId     String?
+  benutzerId   String?
+  benutzerName String?
+  typ          String
+  alterWert    String?
+  neuerWert    String?
+  grund        String?
+  zeitpunkt    DateTime @default(now())
+
+  @@index([bestellungId])
+  @@index([zeitpunkt])
 }
