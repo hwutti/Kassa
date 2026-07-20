@@ -24,7 +24,8 @@ export async function bestellungNeuBerechnen(bestellungId: string) {
 
   const storniert = b.status === "STORNIERT" || b.auslieferungStatus === "CANCELLED";
   const ticketStatus = b.tickets.map((t) => t.status);
-  const fertig = alleTicketsFertig(ticketStatus);
+  // Ohne Tickets gibt es nichts vorzubereiten -> gilt als fertig.
+  const fertig = ticketStatus.length === 0 ? true : alleTicketsFertig(ticketStatus);
   const auslieferungStatus = storniert
     ? b.auslieferungStatus
     : berechneAuslieferung(b.auslieferungStatus, fertig);

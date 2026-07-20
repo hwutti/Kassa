@@ -24,3 +24,16 @@ export async function requireAuth(): Promise<SessionDaten | Response> {
   if (!session) return fehler("Nicht angemeldet.", 401);
   return session;
 }
+
+/**
+ * Für Route-Handler: liefert die Session, wenn die Rolle die Prüfung besteht,
+ * sonst 401 (nicht angemeldet) bzw. 403 (keine Berechtigung).
+ */
+export async function requireRolle(
+  pruefung: (rolle: string) => boolean,
+): Promise<SessionDaten | Response> {
+  const session = await getSession();
+  if (!session) return fehler("Nicht angemeldet.", 401);
+  if (!pruefung(session.rolle)) return fehler("Keine Berechtigung für diese Aktion.", 403);
+  return session;
+}
