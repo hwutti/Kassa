@@ -138,9 +138,10 @@ export async function GET() {
     const session = await requireRolle(darfKellner);
     if (session instanceof Response) return session;
 
+    const nurEigene = session.rolle === "KELLNER" ? session.sub : undefined;
     const bestellungen = await prisma.bestellung.findMany({
       where: {
-        kellnerId: session.rolle === "KELLNER" ? session.sub : undefined,
+        kellnerId: nurEigene,
         bestellStatus: { notIn: ["COMPLETED", "CANCELLED"] },
       },
       orderBy: { createdAt: "asc" },
@@ -150,21 +151,30 @@ export async function GET() {
       },
     });
 
+    const heute = new Date();
+    heute.setHours(0, 0, 0, 0);
+    const erledigtHeute = await prisma.bestellung.count({
+      where: { kellnerId: nurEigene, bestellStatus: "COMPLETED", abgeschlossenAm: { gte: heute } },
+    });
+
     return ok(
-      bestellungen.map((b) => ({
-        id: b.id,
-        nummer: b.nummer,
-        tisch: b.tisch,
-        gast: b.gast,
-        abholnummer: b.abholnummer,
-        summeCent: b.summeCent,
-        bestellStatus: b.bestellStatus,
-        zahlungStatus: b.zahlungStatus,
-        auslieferungStatus: b.auslieferungStatus,
-        createdAt: b.createdAt.toISOString(),
-        positionen: b.positionen,
-        bereiche: b.tickets.map((t) => ({ name: t.arbeitsbereich.name, status: t.status })),
-      })),
+      {
+        erledigtHeute,
+        bestellungen: bestellungen.map((b) => ({
+          id: b.id,
+          nummer: b.nummer,
+          tisch: b.tisch,
+          gast: b.gast,
+          abholnummer: b.abholnummer,
+          summeCent: b.summeCent,
+          bestellStatus: b.bestellStatus,
+          zahlungStatus: b.zahlungStatus,
+          auslieferungStatus: b.auslieferungStatus,
+          createdAt: b.createdAt.toISOString(),
+          positionen: b.positionen,
+          bereiche: b.tickets.map((t) => ({ name: t.arbeitsbereich.name, status: t.status })),
+        })),
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {

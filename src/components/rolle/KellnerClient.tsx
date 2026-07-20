@@ -47,6 +47,7 @@ export function KellnerClient() {
 
   // Meine Bestellungen
   const [meine, setMeine] = useState<MeineBestellung[]>([]);
+  const [erledigtHeute, setErledigtHeute] = useState(0);
   const [fehler, setFehler] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,7 +61,11 @@ export function KellnerClient() {
 
   const ladeMeine = useCallback(async () => {
     try {
-      setMeine(await jsonFetch<MeineBestellung[]>("/api/kellner/bestellungen"));
+      const d = await jsonFetch<{ bestellungen: MeineBestellung[]; erledigtHeute: number }>(
+        "/api/kellner/bestellungen",
+      );
+      setMeine(d.bestellungen);
+      setErledigtHeute(d.erledigtHeute);
     } catch (e) {
       setFehler((e as Error).message);
     }
@@ -148,6 +153,18 @@ export function KellnerClient() {
     const gegebenCent =
       eingabe.trim() === "" ? null : Math.round(Number(eingabe.replace(",", ".")) * 100);
     aktion(b.id, "zahlung", { gegebenCent: Number.isFinite(gegebenCent as number) ? gegebenCent : null });
+  }
+  async function fertigstellen(b: MeineBestellung) {
+    const offene = b.bereiche.filter((a) => a.status !== "READY" && a.status !== "COLLECTED");
+    if (offene.length > 0) {
+      const ok = await dialog.confirm({
+        titel: `Bestellung Nr. ${b.nummer} abschließen?`,
+        text: `Noch nicht fertig gemeldet: ${offene.map((a) => a.name).join(", ")}. Trotzdem als ausgeliefert abschließen?`,
+        bestaetigenText: "Abschließen",
+      });
+      if (!ok) return;
+    }
+    aktion(b.id, "fertigstellen");
   }
 
   return (
@@ -240,11 +257,22 @@ export function KellnerClient() {
           </aside>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {meine.length === 0 && <p className="text-neutral-400">Keine offenen Bestellungen.</p>}
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          {/* Übersicht: Kennzahlen */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Kpi label="Offen" wert={meine.length} />
+            <Kpi label="Abholbereit" wert={meine.filter((b) => b.auslieferungStatus === "READY_FOR_PICKUP").length} akzent />
+            <Kpi label="Zahlung offen" wert={meine.filter((b) => b.zahlungStatus !== "PAID").length} />
+            <Kpi label="Heute erledigt" wert={erledigtHeute} />
+          </div>
+
+          {meine.length === 0 && (
+            <p className="text-neutral-400 text-center py-8">Keine offenen Bestellungen. 🎉</p>
+          )}
           {meine.map((b) => {
             const bereit = b.auslieferungStatus === "READY_FOR_PICKUP";
             const abgeholt = b.auslieferungStatus === "COLLECTED";
+            const ausgeliefert = b.auslieferungStatus === "DELIVERED";
             const bezahlt = b.zahlungStatus === "PAID";
             return (
               <div key={b.id} className={`card p-3 border-l-4 ${bereit ? "border-brand-600" : abgeholt ? "border-blue-500" : "border-neutral-700"}`}>
@@ -252,44 +280,43 @@ export function KellnerClient() {
                   <span className="font-semibold">
                     Nr. {b.nummer}
                     {b.tisch ? ` · Tisch ${b.tisch}` : b.abholnummer ? ` · Nr. ${b.abholnummer}` : ""}
+                    {b.gast ? ` · ${b.gast}` : ""}
                   </span>
                   <span className={`badge ${bereit ? "bg-brand-600/20 text-brand-50" : "bg-neutral-700 text-neutral-300"}`}>
                     {BESTELL_STATUS_LABEL[b.bestellStatus] ?? b.bestellStatus}
                   </span>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {b.bereiche.map((a, i) => (
-                    <span
-                      key={i}
-                      className={`text-xs rounded px-1.5 py-0.5 border ${
-                        a.status === "READY" || a.status === "COLLECTED"
-                          ? "border-brand-600/50 text-brand-50"
-                          : "border-blue-500/50 text-blue-200"
-                      }`}
-                    >
-                      {a.name}
-                      {a.status === "READY" || a.status === "COLLECTED" ? " ✓" : " …"}
-                    </span>
-                  ))}
-                </div>
+                {b.bereiche.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {b.bereiche.map((a, i) => (
+                      <span
+                        key={i}
+                        className={`text-xs rounded px-1.5 py-0.5 border ${
+                          a.status === "READY" || a.status === "COLLECTED"
+                            ? "border-brand-600/50 text-brand-50"
+                            : "border-blue-500/50 text-blue-200"
+                        }`}
+                      >
+                        {a.name}
+                        {a.status === "READY" || a.status === "COLLECTED" ? " ✓" : " …"}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <span className="text-sm text-neutral-400 tabular-nums">
-                    {formatCent(b.summeCent)} · {bezahlt ? "bezahlt" : "Zahlung offen"}
+                    {formatCent(b.summeCent)} · {bezahlt ? "bezahlt ✓" : "Zahlung offen"}
+                    {ausgeliefert ? " · ausgeliefert ✓" : ""}
                   </span>
                   <div className="ml-auto flex gap-2">
-                    {bereit && (
-                      <button className="btn-primary py-1.5 text-sm" onClick={() => aktion(b.id, "abholen")}>
-                        Abholen
-                      </button>
-                    )}
-                    {abgeholt && (
-                      <button className="btn-primary py-1.5 text-sm" onClick={() => aktion(b.id, "ausliefern")}>
-                        Ausliefern
-                      </button>
-                    )}
-                    {!bezahlt && (bereit || abgeholt) && (
+                    {!bezahlt && (
                       <button className="btn-ghost py-1.5 text-sm" onClick={() => kassieren(b)}>
                         Kassieren
+                      </button>
+                    )}
+                    {!ausgeliefert && (
+                      <button className="btn-primary py-1.5 text-sm" onClick={() => fertigstellen(b)}>
+                        Fertigstellen
                       </button>
                     )}
                   </div>
@@ -299,6 +326,15 @@ export function KellnerClient() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function Kpi({ label, wert, akzent }: { label: string; wert: number; akzent?: boolean }) {
+  return (
+    <div className="card p-2 text-center">
+      <div className={`text-2xl font-bold tabular-nums ${akzent && wert > 0 ? "text-brand-50" : ""}`}>{wert}</div>
+      <div className="text-xs text-neutral-400">{label}</div>
     </div>
   );
 }

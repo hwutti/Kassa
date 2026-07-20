@@ -15,6 +15,7 @@ export async function bestellungNeuBerechnen(bestellungId: string) {
     where: { id: bestellungId },
     select: {
       status: true,
+      bestellStatus: true,
       zahlungStatus: true,
       auslieferungStatus: true,
       tickets: { select: { status: true } },
@@ -36,9 +37,17 @@ export async function bestellungNeuBerechnen(bestellungId: string) {
     auslieferungStatus,
   });
 
+  // Zeitpunkt des tatsächlichen Abschlusses festhalten (nur beim Übergang nach COMPLETED).
+  const geradeAbgeschlossen = bestellStatus === "COMPLETED" && b.bestellStatus !== "COMPLETED";
+
   await prisma.bestellung.update({
     where: { id: bestellungId },
-    data: { auslieferungStatus, bestellStatus, status: legacyStatus(bestellStatus) },
+    data: {
+      auslieferungStatus,
+      bestellStatus,
+      status: legacyStatus(bestellStatus),
+      ...(geradeAbgeschlossen ? { abgeschlossenAm: new Date() } : {}),
+    },
   });
   return { auslieferungStatus, bestellStatus };
 }
