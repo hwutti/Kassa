@@ -181,6 +181,35 @@ automatisch berechnet, erhaltenes Bargeld eingeben → Rückgeld erscheint →
 - **Auswertungen:** Umsätze je Bereich/Kategorie/Produkt, Tagesumsatz, Storni.
 - **Übersicht:** Kassenbereitschaft (verkaufbare Produkte, fehlende Preise …).
 
+## Mehrbenutzer-Betrieb (Kellner, Bereiche, Übersicht)
+
+Neben der Schnell-Kasse (`/kasse`, Direktverkauf) gibt es einen Kellner-/Ausgabe-Ablauf:
+
+- **Kellner** (`/kellner`): nimmt Bestellungen auf (Tisch/Gast), sendet sie ab; Positionen
+  werden automatisch an die zuständigen **Arbeitsbereiche** verteilt. Übersicht eigener
+  Bestellungen mit Fortschritt; Abholen / Ausliefern / Kassieren.
+- **Bereich** (`/bereich`): Ticket-Board (Neu → In Vorbereitung → Fertig) für die
+  zugewiesenen Arbeitsbereiche (Küche, Bierausgabe …).
+- **Übersicht** (`/uebersicht`): globale Sicht aller offenen Bestellungen (Supervisor/Admin).
+
+**Getrennte Status:** Zubereitung, Zahlung und Auslieferung werden unabhängig geführt.
+Eine Bestellung ist erst **abgeschlossen**, wenn alle Bereiche fertig sind **und** bezahlt
+**und** vom Kellner ausgeliefert wurde. Rollen/Rechte werden serverseitig geprüft.
+Aktualisierung erfolgt per Polling (Live), Absenden/Statuswechsel erfordern Verbindung.
+
+**Rollen:** ADMIN · KELLNER · BEREICH · KASSA · SUPERVISOR (im Admin unter „Benutzer"
+verwaltbar, inkl. Rechten „darf zahlen/stornieren" und Arbeitsbereich-Zuordnung).
+Der Admin verwaltet Arbeitsbereiche unter „Arbeitsbereiche" und ordnet Produkte im
+Produktformular einem Arbeitsbereich zu.
+
+**Bestehende Installation nachrüsten** (legt Standard-Arbeitsbereiche an und ordnet
+Produkte per Kategorie zu, ohne Daten zu löschen):
+```bash
+cd /opt/kassa && set -a && . ./.env && set +a && npm run arbeitsbereiche:init
+```
+Beispiel-Benutzer (nur bei frischem Seed): `kellner`, `kellner2`, `kasse`, `kueche`, `bier`
+(Passwort = `ADMIN_PASSWORT`).
+
 ## Preisverwaltung & „Preis fehlt“
 
 Verkaufspreise werden **ausschließlich im Administrationsbereich** eingegeben – nie im
