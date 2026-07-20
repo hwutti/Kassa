@@ -3,6 +3,7 @@ import { ok, fehler, handleError } from "@/lib/api";
 import { requireRolle } from "@/lib/auth";
 import { darfKellner } from "@/lib/rollen";
 import { bestellungNeuBerechnen, auditLog } from "@/lib/bestelllogik";
+import { ereignisSenden } from "@/lib/ereignisse";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     ]);
     const neu = await bestellungNeuBerechnen(id);
     await auditLog({ bestellungId: id, benutzerId: session.sub, benutzerName: session.name, typ: "ABGEHOLT" });
+    ereignisSenden("abholen");
     return ok({ auslieferungStatus: "COLLECTED", bestellStatus: neu?.bestellStatus });
   } catch (e) {
     return handleError(e);

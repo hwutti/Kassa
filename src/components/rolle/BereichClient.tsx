@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 import { RollenHeader } from "@/components/rolle/RollenHeader";
+import { useLive } from "@/lib/useLive";
 
 type Ticket = {
   id: string;
@@ -42,9 +43,8 @@ export function BereichClient() {
 
   useEffect(() => {
     laden();
-    const iv = window.setInterval(laden, 4000); // Live-Aktualisierung (Polling)
-    return () => window.clearInterval(iv);
   }, [laden]);
+  useLive(laden); // Live-Aktualisierung (SSE + Fallback)
 
   async function setzen(t: Ticket, status: string) {
     try {

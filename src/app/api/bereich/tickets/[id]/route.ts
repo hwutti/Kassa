@@ -5,6 +5,7 @@ import { requireRolle } from "@/lib/auth";
 import { darfBereich } from "@/lib/rollen";
 import { ticketUebergangErlaubt } from "@/lib/statuslogik";
 import { bestellungNeuBerechnen, auditLog } from "@/lib/bestelllogik";
+import { ereignisSenden } from "@/lib/ereignisse";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       alterWert: ticket.status,
       neuerWert: status,
     });
+    ereignisSenden("ticket");
     return ok({ status, bestellStatus: neu?.bestellStatus });
   } catch (e) {
     return handleError(e);

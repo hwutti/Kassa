@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, fehler, handleError } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { bestellungNeuBerechnen, auditLog } from "@/lib/bestelllogik";
+import { ereignisSenden } from "@/lib/ereignisse";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const neu = await bestellungNeuBerechnen(id);
     await auditLog({ bestellungId: id, benutzerId: session.sub, benutzerName: session.name, typ: "ZAHLUNG_ERFASST", neuerWert: "PAID" });
+    ereignisSenden("zahlung");
     return ok({ zahlungStatus: "PAID", rueckgeldCent, bestellStatus: neu?.bestellStatus });
   } catch (e) {
     return handleError(e);

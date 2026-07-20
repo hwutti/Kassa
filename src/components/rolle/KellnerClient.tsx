@@ -6,6 +6,7 @@ import { formatCent } from "@/lib/money";
 import { RollenHeader } from "@/components/rolle/RollenHeader";
 import { useDialog } from "@/components/ui/DialogProvider";
 import { BESTELL_STATUS_LABEL } from "@/lib/statuslogik";
+import { useLive } from "@/lib/useLive";
 
 type Kat = { id: string; name: string; farbe: string | null; icon: string | null };
 type Prod = { id: string; name: string; preisCent: number; icon: string | null; kategorieId: string };
@@ -66,9 +67,8 @@ export function KellnerClient() {
   }, []);
   useEffect(() => {
     ladeMeine();
-    const iv = window.setInterval(ladeMeine, 4000);
-    return () => window.clearInterval(iv);
   }, [ladeMeine]);
+  useLive(ladeMeine);
 
   const gefiltert = useMemo(
     () => produkte.filter((p) => !katFilter || p.kategorieId === katFilter),

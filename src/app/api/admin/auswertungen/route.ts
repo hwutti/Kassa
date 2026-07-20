@@ -34,6 +34,7 @@ export async function GET(req: Request) {
         positionen: true,
         verkaufsbereich: { select: { name: true } },
         veranstaltung: { select: { name: true } },
+        kellner: { select: { anzeigename: true, benutzername: true } },
       },
     });
     const anzahlStorniert = await prisma.bestellung.count({
@@ -58,10 +59,16 @@ export async function GET(req: Request) {
     const jeKategorie = new Map<string, number>();
     const jeVeranstaltung = new Map<string, number>();
     const jeProdukt = new Map<string, { umsatzCent: number; menge: number }>();
+    const jeKellnerMap = new Map<string, { umsatzCent: number; anzahl: number }>();
 
     for (const b of abgeschlossen) {
       const vName = b.veranstaltung?.name ?? "Ohne Veranstaltung";
       jeVeranstaltung.set(vName, (jeVeranstaltung.get(vName) ?? 0) + b.summeCent);
+      const kName = b.kellner?.anzeigename ?? b.kellner?.benutzername ?? "Direktverkauf";
+      const kCur = jeKellnerMap.get(kName) ?? { umsatzCent: 0, anzahl: 0 };
+      kCur.umsatzCent += b.summeCent;
+      kCur.anzahl += 1;
+      jeKellnerMap.set(kName, kCur);
       for (const p of b.positionen) {
         jeKategorie.set(p.kategorieName || "—", (jeKategorie.get(p.kategorieName || "—") ?? 0) + p.summeCent);
         // Positionsgenau: Umsatz je Verkaufsbereich aus der Position (Fallback: Bestellbereich).
@@ -74,6 +81,19 @@ export async function GET(req: Request) {
       }
     }
 
+    // Durchschnittliche Zubereitungszeit (Ticket erstellt -> fertig).
+    const fertigeTickets = await prisma.bereichsticket.findMany({
+      where: { fertigAm: { not: null }, bestellung: zeitraum },
+      select: { createdAt: true, fertigAm: true },
+    });
+    const zubereitungMs = fertigeTickets.reduce(
+      (s, t) => s + (t.fertigAm!.getTime() - t.createdAt.getTime()),
+      0,
+    );
+    const zubereitungMinDurchschnitt = fertigeTickets.length
+      ? Math.round(zubereitungMs / fertigeTickets.length / 60000)
+      : 0;
+
     const sortMap = (m: Map<string, number>) =>
       [...m.entries()].map(([name, umsatzCent]) => ({ name, umsatzCent })).sort((a, b) => b.umsatzCent - a.umsatzCent);
 
@@ -84,9 +104,13 @@ export async function GET(req: Request) {
         tagesumsatzCent,
         durchschnittCent,
         anzahlStorniert,
+        zubereitungMinDurchschnitt,
         jeVerkaufsbereich: sortMap(jeBereich),
         jeKategorie: sortMap(jeKategorie),
         jeVeranstaltung: sortMap(jeVeranstaltung),
+        jeKellner: [...jeKellnerMap.entries()]
+          .map(([name, v]) => ({ name, umsatzCent: v.umsatzCent, anzahl: v.anzahl }))
+          .sort((a, b) => b.umsatzCent - a.umsatzCent),
         jeProdukt: [...jeProdukt.entries()]
           .map(([name, v]) => ({ name, umsatzCent: v.umsatzCent, menge: v.menge }))
           .sort((a, b) => b.umsatzCent - a.umsatzCent),

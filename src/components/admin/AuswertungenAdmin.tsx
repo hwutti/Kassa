@@ -11,9 +11,11 @@ type Auswertung = {
   tagesumsatzCent: number;
   durchschnittCent: number;
   anzahlStorniert: number;
+  zubereitungMinDurchschnitt: number;
   jeVerkaufsbereich: NameUmsatz[];
   jeKategorie: NameUmsatz[];
   jeVeranstaltung: NameUmsatz[];
+  jeKellner: { name: string; umsatzCent: number; anzahl: number }[];
   jeProdukt: { name: string; umsatzCent: number; menge: number }[];
 };
 type Bereich = { id: string; name: string };
@@ -113,13 +115,40 @@ export function AuswertungenAdmin() {
       {daten && (
         <>
           {/* Kennzahlen */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <Kennzahl label="Gesamtumsatz" wert={formatCent(daten.gesamtumsatzCent)} gross />
             <Kennzahl label="Tagesumsatz (heute)" wert={formatCent(daten.tagesumsatzCent)} />
             <Kennzahl label="Bestellungen" wert={String(daten.anzahlBestellungen)} />
             <Kennzahl label="Ø Bestellwert" wert={formatCent(daten.durchschnittCent)} />
+            <Kennzahl label="Ø Zubereitung" wert={`${daten.zubereitungMinDurchschnitt} min`} />
             <Kennzahl label="Storniert" wert={String(daten.anzahlStorniert)} />
           </div>
+
+          {daten.jeKellner.length > 0 && (
+            <div className="card p-3">
+              <h3 className="font-semibold mb-2">Umsatz je Kellner</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[20rem]">
+                  <thead>
+                    <tr className="text-left text-neutral-400 border-b border-neutral-800">
+                      <th className="py-1 pr-3">Kellner</th>
+                      <th className="py-1 pr-3 text-right">Bestellungen</th>
+                      <th className="py-1 pr-3 text-right">Umsatz</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {daten.jeKellner.map((k) => (
+                      <tr key={k.name} className="border-b border-neutral-900">
+                        <td className="py-1 pr-3">{k.name}</td>
+                        <td className="py-1 pr-3 text-right tabular-nums">{k.anzahl}</td>
+                        <td className="py-1 pr-3 text-right tabular-nums">{formatCent(k.umsatzCent)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           <UmsatzListe titel="Umsatz je Veranstaltung" eintraege={daten.jeVeranstaltung} />
 

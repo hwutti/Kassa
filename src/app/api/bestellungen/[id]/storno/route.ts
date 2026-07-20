@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, fehler, handleError } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { verifyPasswort } from "@/lib/passwort";
+import { ereignisSenden } from "@/lib/ereignisse";
 
 export const dynamic = "force-dynamic";
 
@@ -46,9 +47,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const aktualisiert = await prisma.bestellung.update({
       where: { id },
-      data: { status: "STORNIERT", storniertAm: new Date(), stornoGrund: grund, storniertVon },
+      data: {
+        status: "STORNIERT",
+        bestellStatus: "CANCELLED",
+        storniertAm: new Date(),
+        stornoGrund: grund,
+        storniertVon,
+      },
       select: { id: true, nummer: true, status: true },
     });
+    ereignisSenden("storno");
     return ok(aktualisiert);
   } catch (e) {
     return handleError(e);

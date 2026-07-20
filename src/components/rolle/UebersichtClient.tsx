@@ -5,6 +5,7 @@ import { jsonFetch } from "@/lib/client";
 import { formatCent } from "@/lib/money";
 import { RollenHeader } from "@/components/rolle/RollenHeader";
 import { BESTELL_STATUS_LABEL } from "@/lib/statuslogik";
+import { useLive } from "@/lib/useLive";
 
 type Bestellung = {
   id: string;
@@ -42,9 +43,8 @@ export function UebersichtClient() {
   }, []);
   useEffect(() => {
     laden();
-    const iv = window.setInterval(laden, 4000);
-    return () => window.clearInterval(iv);
   }, [laden]);
+  useLive(laden);
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
