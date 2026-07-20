@@ -23,12 +23,18 @@ async function main() {
 
   console.log("Seed: räume bestehende Stammdaten auf …");
   await prisma.bestellPosition.deleteMany();
+  await prisma.bereichsticket.deleteMany();
+  await prisma.zahlung.deleteMany();
   await prisma.bestellung.deleteMany();
+  await prisma.auditEreignis.deleteMany();
   await prisma.preishistorie.deleteMany();
   await prisma.produktVerkaufsbereich.deleteMany();
+  await prisma.produktArbeitsbereich.deleteMany();
+  await prisma.benutzerArbeitsbereich.deleteMany();
   await prisma.produkt.deleteMany();
   await prisma.kategorie.deleteMany();
   await prisma.verkaufsbereich.deleteMany();
+  await prisma.arbeitsbereich.deleteMany();
   await prisma.veranstaltung.deleteMany();
   await prisma.zaehler.deleteMany();
 
@@ -113,7 +119,26 @@ async function main() {
     }),
   };
 
-  // Hilfsfunktion: Produkt OHNE Preis anlegen und Bereichen zuordnen.
+  // --- Arbeitsbereiche (Ausgabe-/Zubereitungsstellen) ---
+  const ab = {
+    bier: await prisma.arbeitsbereich.create({ data: { name: "Bierausgabe", icon: "🍺", sortierung: 1 } }),
+    wein: await prisma.arbeitsbereich.create({ data: { name: "Weinausgabe", icon: "🍷", sortierung: 2 } }),
+    getraenke: await prisma.arbeitsbereich.create({ data: { name: "Getränke (alkoholfrei)", icon: "🥤", sortierung: 3 } }),
+    kueche: await prisma.arbeitsbereich.create({ data: { name: "Küche", icon: "🍳", sortierung: 4 } }),
+    kaffee: await prisma.arbeitsbereich.create({ data: { name: "Kaffee und Kuchen", icon: "☕", sortierung: 5 } }),
+    schnaps: await prisma.arbeitsbereich.create({ data: { name: "Schnapsausgabe", icon: "🥃", sortierung: 6 } }),
+  };
+  // Kategorie -> zuständiger Arbeitsbereich (Standard-Routing, im Admin änderbar).
+  const katToArea: Record<string, string> = {
+    [kat.bier.id]: ab.bier.id,
+    [kat.wein.id]: ab.wein.id,
+    [kat.afrei.id]: ab.getraenke.id,
+    [kat.essen.id]: ab.kueche.id,
+    [kat.kaffee.id]: ab.kaffee.id,
+    [kat.schnaps.id]: ab.schnaps.id,
+  };
+
+  // Hilfsfunktion: Produkt OHNE Preis anlegen, Verkaufsbereichen + Arbeitsbereich zuordnen.
   let sort = 0;
   async function p(name: string, kategorieId: string, icon: string, bereiche: string[]) {
     const prod = await prisma.produkt.create({
@@ -122,6 +147,12 @@ async function main() {
     for (const b of bereiche) {
       await prisma.produktVerkaufsbereich.create({
         data: { produktId: prod.id, verkaufsbereichId: b },
+      });
+    }
+    const area = katToArea[kategorieId];
+    if (area) {
+      await prisma.produktArbeitsbereich.create({
+        data: { produktId: prod.id, arbeitsbereichId: area, primaer: true },
       });
     }
   }
@@ -185,8 +216,24 @@ async function main() {
   await p("Likör", kat.schnaps.id, "🍸", [vb.schnaps.id]);
   await p("Schnapsmischung", kat.schnaps.id, "🥃", [vb.schnaps.id]);
 
+  // --- Beispiel-Benutzer (Passwort wie Admin für einfaches Testen) ---
+  async function benutzer(benutzername: string, anzeigename: string, rolle: string, extra: Record<string, unknown> = {}) {
+    return prisma.benutzer.upsert({
+      where: { benutzername },
+      update: {},
+      create: { benutzername, anzeigename, passwortHash: hashPasswort(adminPass), rolle, ...extra },
+    });
+  }
+  await benutzer("kellner", "Kellner Max", "KELLNER", { darfZahlen: true });
+  await benutzer("kellner2", "Kellnerin Eva", "KELLNER");
+  await benutzer("kasse", "Kasse", "KASSA", { darfZahlen: true, darfStornieren: true });
+  const kuecheUser = await benutzer("kueche", "Küche", "BEREICH");
+  const bierUser = await benutzer("bier", "Bierausgabe", "BEREICH");
+  await prisma.benutzerArbeitsbereich.create({ data: { benutzerId: kuecheUser.id, arbeitsbereichId: ab.kueche.id } });
+  await prisma.benutzerArbeitsbereich.create({ data: { benutzerId: bierUser.id, arbeitsbereichId: ab.bier.id } });
+
   const anzahl = await prisma.produkt.count();
-  console.log(`Seed abgeschlossen: ${anzahl} Produkte (ohne Preis – bitte im Admin pflegen).`);
+  console.log(`Seed abgeschlossen: ${anzahl} Produkte (ohne Preis), 6 Arbeitsbereiche, Beispiel-Benutzer.`);
 }
 
 main()

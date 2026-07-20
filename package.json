@@ -19,6 +19,7 @@
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
     "admin:create": "tsx scripts/create-admin.ts",
+    "arbeitsbereiche:init": "tsx scripts/init-arbeitsbereiche.ts",
     "gen:icons": "node scripts/gen-icons.mjs"
   },
   "prisma": {
