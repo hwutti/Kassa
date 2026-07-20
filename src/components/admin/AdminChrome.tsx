@@ -10,6 +10,7 @@ const NAV = [
   { href: "/admin/preise", label: "Preise" },
   { href: "/admin/kategorien", label: "Kategorien" },
   { href: "/admin/verkaufsbereiche", label: "Verkaufsbereiche" },
+  { href: "/admin/arbeitsbereiche", label: "Arbeitsbereiche" },
   { href: "/admin/veranstaltungen", label: "Veranstaltungen" },
   { href: "/admin/bestellungen", label: "Bestellungen" },
   { href: "/admin/auswertungen", label: "Auswertungen" },

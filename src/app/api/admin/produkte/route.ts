@@ -13,6 +13,7 @@ export async function GET() {
       include: {
         kategorie: { select: { id: true, name: true, aktiv: true } },
         verkaufsbereiche: { select: { verkaufsbereichId: true } },
+        arbeitsbereiche: { select: { arbeitsbereichId: true, primaer: true } },
       },
     });
     return ok(
@@ -30,6 +31,10 @@ export async function GET() {
         sortierung: p.sortierung,
         kategorie: p.kategorie,
         verkaufsbereichIds: p.verkaufsbereiche.map((v) => v.verkaufsbereichId),
+        arbeitsbereichId:
+          p.arbeitsbereiche.find((a) => a.primaer)?.arbeitsbereichId ??
+          p.arbeitsbereiche[0]?.arbeitsbereichId ??
+          null,
       })),
       { headers: { "Cache-Control": "no-store" } },
     );
@@ -49,6 +54,7 @@ const CreateSchema = z.object({
   sortierung: z.number().int().optional(),
   kategorieId: z.string().min(1),
   verkaufsbereichIds: z.array(z.string().min(1)).default([]),
+  arbeitsbereichId: z.string().min(1).nullable().optional(), // primärer Arbeitsbereich
 });
 
 /** POST /api/admin/produkte */
@@ -70,6 +76,9 @@ export async function POST(req: Request) {
         verkaufsbereiche: {
           create: daten.verkaufsbereichIds.map((verkaufsbereichId) => ({ verkaufsbereichId })),
         },
+        arbeitsbereiche: daten.arbeitsbereichId
+          ? { create: [{ arbeitsbereichId: daten.arbeitsbereichId, primaer: true }] }
+          : undefined,
       },
     });
     return ok(produkt, { status: 201 });

@@ -17,6 +17,7 @@ const UpdateSchema = z.object({
   sortierung: z.number().int().optional(),
   kategorieId: z.string().min(1).optional(),
   verkaufsbereichIds: z.array(z.string().min(1)).optional(),
+  arbeitsbereichId: z.string().min(1).nullable().optional(), // primärer Arbeitsbereich (null = entfernen)
 });
 
 /** PATCH /api/admin/produkte/[id] – aktualisiert Felder, Preis und Bereichszuordnung. */
@@ -61,6 +62,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
               produktId: id,
               verkaufsbereichId,
             })),
+          });
+        }
+      }
+      // Arbeitsbereich (primär) ggf. neu setzen.
+      if (daten.arbeitsbereichId !== undefined) {
+        await tx.produktArbeitsbereich.deleteMany({ where: { produktId: id } });
+        if (daten.arbeitsbereichId) {
+          await tx.produktArbeitsbereich.create({
+            data: { produktId: id, arbeitsbereichId: daten.arbeitsbereichId, primaer: true },
           });
         }
       }

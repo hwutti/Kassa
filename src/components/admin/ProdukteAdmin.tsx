@@ -17,6 +17,7 @@ type Produkt = {
   sortierung: number;
   kategorie: { id: string; name: string; aktiv: boolean };
   verkaufsbereichIds: string[];
+  arbeitsbereichId: string | null;
 };
 type Kategorie = { id: string; name: string; aktiv: boolean };
 type Bereich = { id: string; name: string; aktiv: boolean };
@@ -32,6 +33,7 @@ type FormState = {
   aktiv: boolean;
   kategorieId: string;
   verkaufsbereichIds: string[];
+  arbeitsbereichId: string;
 };
 
 const LEER: FormState = {
@@ -44,6 +46,7 @@ const LEER: FormState = {
   aktiv: true,
   kategorieId: "",
   verkaufsbereichIds: [],
+  arbeitsbereichId: "",
 };
 
 export function ProdukteAdmin() {
@@ -51,6 +54,7 @@ export function ProdukteAdmin() {
   const [produkte, setProdukte] = useState<Produkt[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [bereiche, setBereiche] = useState<Bereich[]>([]);
+  const [arbeitsbereiche, setArbeitsbereiche] = useState<Bereich[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
   const [ladt, setLadt] = useState(true);
   const [form, setForm] = useState<FormState | null>(null);
@@ -59,14 +63,16 @@ export function ProdukteAdmin() {
   async function laden() {
     setLadt(true);
     try {
-      const [p, k, b] = await Promise.all([
+      const [p, k, b, a] = await Promise.all([
         jsonFetch<Produkt[]>("/api/admin/produkte"),
         jsonFetch<Kategorie[]>("/api/admin/kategorien"),
         jsonFetch<Bereich[]>("/api/admin/verkaufsbereiche"),
+        jsonFetch<Bereich[]>("/api/admin/arbeitsbereiche"),
       ]);
       setProdukte(p);
       setKategorien(k);
       setBereiche(b);
+      setArbeitsbereiche(a);
       setFehler(null);
     } catch (e) {
       setFehler((e as Error).message);
@@ -93,6 +99,7 @@ export function ProdukteAdmin() {
       aktiv: p.aktiv,
       kategorieId: p.kategorie.id,
       verkaufsbereichIds: p.verkaufsbereichIds,
+      arbeitsbereichId: p.arbeitsbereichId ?? "",
     });
   }
 
@@ -118,6 +125,7 @@ export function ProdukteAdmin() {
       aktiv: form.aktiv,
       kategorieId: form.kategorieId,
       verkaufsbereichIds: form.verkaufsbereichIds,
+      arbeitsbereichId: form.arbeitsbereichId || null,
     };
     try {
       if (form.id) {
@@ -235,6 +243,7 @@ export function ProdukteAdmin() {
           setForm={setForm}
           kategorien={kategorien}
           bereiche={bereiche}
+          arbeitsbereiche={arbeitsbereiche}
           onSpeichern={speichern}
           onAbbrechen={() => setForm(null)}
         />
@@ -248,6 +257,7 @@ function ProduktForm({
   setForm,
   kategorien,
   bereiche,
+  arbeitsbereiche,
   onSpeichern,
   onAbbrechen,
 }: {
@@ -255,6 +265,7 @@ function ProduktForm({
   setForm: (f: FormState) => void;
   kategorien: Kategorie[];
   bereiche: Bereich[];
+  arbeitsbereiche: Bereich[];
   onSpeichern: () => void;
   onAbbrechen: () => void;
 }) {
@@ -388,6 +399,23 @@ function ProduktForm({
             </select>
           </label>
         </div>
+
+        <label className="block">
+          <span className="text-sm text-neutral-400">Arbeitsbereich (Zubereitung/Ausgabe)</span>
+          <select
+            className="input mt-1"
+            value={form.arbeitsbereichId}
+            onChange={(e) => setForm({ ...form, arbeitsbereichId: e.target.value })}
+          >
+            <option value="">– keiner –</option>
+            {arbeitsbereiche.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+                {!a.aktiv ? " (inaktiv)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <div>
           <span className="text-sm text-neutral-400">Verkaufsbereiche</span>
