@@ -1,0 +1,409 @@
+<style>
+  :root {
+    --bg: #07090d;
+    --panel: #0f1319;
+    --card: #141a23;
+    --card2: #1a212c;
+    --line: #232c39;
+    --line2: #2e3947;
+    --fg: #eef2f7;
+    --muted: #9aa7b8;
+    --muted2: #6b7787;
+    --brand: #16a34a;
+    --brand-fg: #eafff1;
+    --blau: #3b82f6;
+    --amber: #f59e0b;
+    --rot: #ef4444;
+    --gold: #d9a441;
+    --radius: 16px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body, .mk { margin: 0; }
+  .mk {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background:
+      radial-gradient(900px 500px at 12% -8%, rgba(22,163,74,.12), transparent 60%),
+      radial-gradient(800px 500px at 100% 0%, rgba(59,130,246,.10), transparent 55%),
+      var(--bg);
+    color: var(--fg);
+    min-height: 100vh;
+    padding: 18px clamp(12px, 4vw, 40px) 60px;
+    line-height: 1.45;
+  }
+  .tabnum { font-variant-numeric: tabular-nums; }
+
+  /* Kopf */
+  .mk-head { max-width: 1180px; margin: 0 auto 18px; }
+  .mk-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .mk-logo {
+    width: 40px; height: 40px; border-radius: 12px; flex: none;
+    background: linear-gradient(135deg, #1fbf5a, #12813c);
+    display: grid; place-items: center; font-size: 22px;
+  }
+  .mk-title h1 { font-size: clamp(18px, 2.4vw, 24px); margin: 0; letter-spacing: -.01em; }
+  .mk-title p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+  .mk-badge { margin-left: auto; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); border: 1px solid var(--line2); border-radius: 999px; padding: 5px 11px; }
+
+  .mk-toolbar { max-width: 1180px; margin: 0 auto 16px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+    justify-content: space-between; }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill { background: var(--card); border: 1px solid var(--line); color: var(--muted); border-radius: 999px;
+    padding: 7px 13px; font-size: 13px; cursor: pointer; transition: .12s; white-space: nowrap; }
+  .pill:hover { border-color: var(--line2); color: var(--fg); }
+  .pill[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: white; font-weight: 600; }
+  .dev { display: flex; gap: 6px; align-items: center; }
+  .dev .lbl { font-size: 11px; color: var(--muted2); text-transform: uppercase; letter-spacing: .08em; margin-right: 2px; }
+  .dev .pill[aria-pressed="true"] { background: var(--card2); border-color: var(--line2); color: var(--fg); }
+
+  /* Geräte-Rahmen */
+  .frame-wrap { max-width: 1180px; margin: 0 auto; display: flex; justify-content: center; }
+  .frame {
+    width: 100%; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 22px; overflow: hidden; box-shadow: 0 24px 60px -30px rgba(0,0,0,.8);
+    transition: max-width .25s ease;
+  }
+  .frame[data-dev="handy"] { max-width: 390px; }
+  .frame[data-dev="tablet"] { max-width: 1024px; }
+  .frame[data-dev="desktop"] { max-width: 1180px; }
+
+  .caption { max-width: 1180px; margin: 14px auto 0; color: var(--muted); font-size: 13px; text-align: center; }
+
+  /* Interner App-Kopf */
+  .app-top { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line);
+    background: rgba(15,19,25,.9); flex-wrap: wrap; }
+  .app-top .name { font-weight: 700; }
+  .app-top .sub { color: var(--muted2); font-size: 12px; }
+  .chip { font-size: 11px; border-radius: 999px; padding: 4px 9px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+  .chip.on { background: rgba(22,163,74,.16); color: #6ee7a0; }
+  .chip.role { background: rgba(59,130,246,.16); color: #9dc0ff; }
+  .spacer { margin-left: auto; }
+  .btn { border: 0; border-radius: 12px; padding: 9px 14px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn.pri { background: var(--brand); color: white; }
+  .btn.ghost { background: var(--card2); color: var(--fg); }
+  .btn.warn { background: var(--amber); color: #241a02; }
+  .btn.sm { padding: 6px 11px; font-size: 13px; border-radius: 10px; }
+  .btn.block { width: 100%; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+  .pad { padding: 14px; }
+
+  /* Karten & Raster */
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+  .grid { display: grid; gap: 10px; }
+  .kacheln { grid-template-columns: repeat(2, 1fr); }
+  .frame[data-dev="tablet"] .kacheln, .frame[data-dev="desktop"] .kacheln { grid-template-columns: repeat(4, 1fr); }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px; }
+  .tile .n { font-weight: 600; display: flex; gap: 6px; align-items: flex-start; }
+  .tile .pr { color: #7fe0a3; font-weight: 700; margin-top: 6px; }
+  .stepper { display: flex; gap: 6px; margin-top: 8px; }
+  .stepper b { flex: none; width: 34px; text-align: center; align-self: center; font-weight: 700; }
+  .sq { flex: 1; height: 34px; border-radius: 9px; border: 0; font-size: 18px; font-weight: 700; cursor: pointer; }
+  .sq.minus { background: var(--card2); color: var(--fg); }
+  .sq.plus { background: var(--brand); color: white; }
+
+  .row { display: flex; gap: 8px; }
+  .col { display: flex; flex-direction: column; gap: 10px; }
+  .between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted2); }
+
+  .status { font-size: 11px; border-radius: 999px; padding: 3px 9px; font-weight: 700; white-space: nowrap; }
+  .s-queue { background: rgba(154,167,184,.16); color: #c3ccd8; }
+  .s-prep  { background: rgba(59,130,246,.18); color: #9dc0ff; }
+  .s-ready { background: rgba(22,163,74,.18); color: #6ee7a0; }
+  .s-wait  { background: rgba(245,158,11,.18); color: #ffd27a; }
+  .s-pay   { background: rgba(217,164,65,.18); color: #f0cd8a; }
+  .s-done  { background: rgba(22,163,74,.28); color: #b6f6cc; }
+  .s-cancel{ background: rgba(239,68,68,.18); color: #ff9d9d; }
+
+  input.f, select.f { width: 100%; background: var(--card2); border: 1px solid var(--line2); color: var(--fg);
+    border-radius: 11px; padding: 9px 11px; font-size: 14px; font-family: inherit; }
+
+  /* Küche-Spalten */
+  .board { display: grid; gap: 12px; grid-template-columns: 1fr; }
+  .frame[data-dev="tablet"] .board, .frame[data-dev="desktop"] .board { grid-template-columns: repeat(3, 1fr); }
+  .board h3 { font-size: 13px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .ticket { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--line2); border-radius: 12px;
+    padding: 10px; margin-bottom: 10px; }
+  .ticket.neu { border-left-color: var(--muted2); }
+  .ticket.prep { border-left-color: var(--blau); }
+  .ticket.fertig { border-left-color: var(--brand); }
+  .ticket .hd { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .ticket .nr { font-weight: 700; }
+  .ticket ul { margin: 8px 0; padding-left: 18px; }
+  .ticket li { margin: 2px 0; }
+  .ticket .note { font-size: 12px; color: #ffd27a; }
+  .wait { font-size: 12px; color: var(--muted2); }
+  .wait.late { color: #ff9d9d; font-weight: 700; }
+
+  /* Tabelle (globale Übersicht) */
+  .tbl-wrap { overflow-x: auto; }
+  table.mt { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 720px; }
+  table.mt th, table.mt td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.mt th { color: var(--muted2); text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 999px; margin-right: 5px; vertical-align: middle; }
+  .d-ready { background: var(--brand); } .d-prep { background: var(--blau); } .d-queue { background: var(--muted2); }
+  .areas { display: flex; gap: 5px; flex-wrap: wrap; }
+  .areatag { font-size: 11px; border-radius: 7px; padding: 2px 7px; border: 1px solid var(--line2); }
+  .areatag.ok { border-color: rgba(22,163,74,.5); color: #8ff0b4; }
+  .areatag.busy { border-color: rgba(59,130,246,.5); color: #a9c8ff; }
+
+  .kpi { display: grid; gap: 10px; grid-template-columns: repeat(2,1fr); }
+  .frame[data-dev="tablet"] .kpi, .frame[data-dev="desktop"] .kpi { grid-template-columns: repeat(4,1fr); }
+  .kpi .card { padding: 12px; }
+  .kpi .v { font-size: 22px; font-weight: 800; }
+
+  .flow { display: grid; gap: 10px; grid-template-columns: 1fr; }
+  .frame[data-dev="desktop"] .flow, .frame[data-dev="tablet"] .flow { grid-template-columns: 1.2fr 1fr; }
+  .keypad { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; }
+  .keypad .k { height: 42px; border-radius: 10px; background: var(--card2); border: 0; color: var(--fg); font-size: 17px; font-weight: 600; }
+  .three { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+  .stat-box { border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; }
+  .stat-box .lbl { margin-bottom: 6px; }
+</style>
+
+<div class="mk">
+  <div class="mk-head">
+    <div class="mk-title">
+      <div class="mk-logo">🍺</div>
+      <div>
+        <h1>POS-Kasse · Mehrbenutzer-Bestellsystem</h1>
+        <p>Klickbarer Mockup-Prototyp · Kellner → Bereiche → Ausgabe · getrennte Status für Zubereitung / Zahlung / Auslieferung</p>
+      </div>
+      <span class="mk-badge">Mockup · nicht funktional</span>
+    </div>
+  </div>
+
+  <div class="mk-toolbar">
+    <div class="pills" id="views">
+      <button class="pill" data-v="login" aria-pressed="false">Anmeldung</button>
+      <button class="pill" data-v="aufnahme" aria-pressed="true">Kellner · Aufnahme</button>
+      <button class="pill" data-v="kellner" aria-pressed="false">Kellner · Übersicht</button>
+      <button class="pill" data-v="kueche" aria-pressed="false">Bereich (Küche)</button>
+      <button class="pill" data-v="global" aria-pressed="false">Globale Übersicht</button>
+      <button class="pill" data-v="bezahlen" aria-pressed="false">Bezahlen / Ausliefern</button>
+      <button class="pill" data-v="admin" aria-pressed="false">Admin</button>
+    </div>
+    <div class="dev" id="devs">
+      <span class="lbl">Gerät</span>
+      <button class="pill" data-d="handy" aria-pressed="false">Handy</button>
+      <button class="pill" data-d="tablet" aria-pressed="true">Tablet</button>
+      <button class="pill" data-d="desktop" aria-pressed="false">Desktop</button>
+    </div>
+  </div>
+
+  <div class="frame-wrap">
+    <div class="frame" id="frame" data-dev="tablet">
+
+      <!-- ANMELDUNG -->
+      <section class="view" data-view="login">
+        <div class="app-top"><span class="mk-logo" style="width:28px;height:28px;font-size:16px;border-radius:8px">🍺</span><span class="name">Kirchtagsfest</span><span class="spacer"></span></div>
+        <div class="pad col" style="max-width:360px;margin:0 auto;padding-top:34px;padding-bottom:40px">
+          <div style="text-align:center;margin-bottom:6px"><div style="font-size:34px">👋</div><h2 style="margin:6px 0 0">Anmelden</h2><p class="muted small">Persönliches Konto für Kellner, Bereich, Kasse & Admin</p></div>
+          <div><div class="lbl">Benutzername</div><input class="f" value="max.kellner" style="margin-top:5px"></div>
+          <div><div class="lbl">PIN / Passwort</div><input class="f" type="password" value="••••" style="margin-top:5px"></div>
+          <button class="btn pri block">Anmelden</button>
+          <p class="muted small" style="text-align:center">Rolle wird automatisch geladen · Rechte serverseitig geprüft</p>
+        </div>
+      </section>
+
+      <!-- KELLNER AUFNAHME -->
+      <section class="view active" data-view="aufnahme">
+        <div class="app-top">
+          <span class="name">Bestellaufnahme</span>
+          <span class="chip role">👤 Kellner: Max</span>
+          <span class="spacer"></span>
+          <span class="chip on">● Online</span>
+        </div>
+        <div class="pad">
+          <div class="row" style="margin-bottom:10px;flex-wrap:wrap">
+            <input class="f" placeholder="Tisch / Abholnr." value="Tisch 7" style="flex:1;min-width:120px">
+            <input class="f" placeholder="Gast (optional)" value="Gruppe Huber" style="flex:1;min-width:120px">
+          </div>
+          <div class="pills" style="margin-bottom:10px">
+            <button class="pill" aria-pressed="true">Alle</button>
+            <button class="pill">Bier &amp; Radler</button>
+            <button class="pill">Wein</button>
+            <button class="pill">Essen</button>
+            <button class="pill">Kaffee</button>
+          </div>
+          <div class="grid kacheln">
+            <div class="tile"><div class="n">🍺 Bier klein</div><div class="pr tabnum">€ 3,50</div><div class="stepper"><button class="sq minus">–</button><b>2</b><button class="sq plus">+</button></div></div>
+            <div class="tile"><div class="n">🍺 Bier groß</div><div class="pr tabnum">€ 4,80</div><div class="stepper"><button class="sq minus">–</button><b>0</b><button class="sq plus">+</button></div></div>
+            <div class="tile"><div class="n">🥂 Spritzer</div><div class="pr tabnum">€ 3,80</div><div class="stepper"><button class="sq minus">–</button><b>1</b><button class="sq plus">+</button></div></div>
+            <div class="tile"><div class="n">🌭 Bratwürstel</div><div class="pr tabnum">€ 4,50</div><div class="stepper"><button class="sq minus">–</button><b>2</b><button class="sq plus">+</button></div></div>
+            <div class="tile"><div class="n">🍰 Kuchen</div><div class="pr tabnum">€ 3,20</div><div class="stepper"><button class="sq minus">–</button><b>0</b><button class="sq plus">+</button></div></div>
+            <div class="tile"><div class="n">☕ Kaffee</div><div class="pr tabnum">€ 2,60</div><div class="stepper"><button class="sq minus">–</button><b>1</b><button class="sq plus">+</button></div></div>
+          </div>
+          <div class="card pad" style="margin-top:12px">
+            <div class="between"><span class="lbl">Warenkorb · Tisch 7</span><span class="muted small">6 Positionen</span></div>
+            <div class="between small" style="margin-top:6px"><span>2× Bier klein · 1× Spritzer · 2× Bratwürstel · 1× Kaffee</span></div>
+            <input class="f" style="margin-top:8px" placeholder="Notiz (z. B. Bratwürstel ohne Senf)">
+            <div class="between" style="margin-top:10px"><span class="lbl">Gesamt</span><span class="tabnum" style="font-size:22px;font-weight:800">€ 20,90</span></div>
+            <button class="btn pri block" style="margin-top:10px">Bestellung absenden →</button>
+            <p class="muted small" style="text-align:center;margin:8px 0 0">Positionen werden automatisch an Küche, Bier &amp; Wein verteilt</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- KELLNER ÜBERSICHT -->
+      <section class="view" data-view="kellner">
+        <div class="app-top"><span class="name">Meine Bestellungen</span><span class="chip role">👤 Kellner: Max</span><span class="spacer"></span><span class="chip on">🔔 1 abholbereit</span></div>
+        <div class="pad col">
+          <div class="card pad" style="border-left:4px solid var(--brand)">
+            <div class="between"><span><b>Nr. 1042</b> · Tisch 7</span><span class="status s-ready">ABHOLBEREIT</span></div>
+            <div class="areas" style="margin-top:8px">
+              <span class="areatag ok">Bier ✓</span><span class="areatag ok">Wein ✓</span><span class="areatag ok">Küche ✓</span><span class="areatag ok">Kaffee ✓</span>
+            </div>
+            <div class="between" style="margin-top:10px"><span class="muted small tabnum">€ 20,90 · Zahlung offen</span><button class="btn pri sm">Abholen &amp; ausliefern</button></div>
+          </div>
+          <div class="card pad" style="border-left:4px solid var(--blau)">
+            <div class="between"><span><b>Nr. 1043</b> · Tisch 3</span><span class="status s-prep">IN VORBEREITUNG</span></div>
+            <div class="areas" style="margin-top:8px">
+              <span class="areatag ok">Bier ✓</span><span class="areatag busy">Küche …</span>
+            </div>
+            <div class="wait" style="margin-top:8px">seit 4 min · warte auf Küche</div>
+          </div>
+          <div class="card pad" style="border-left:4px solid var(--muted2)">
+            <div class="between"><span><b>Nr. 1045</b> · Abholnr. 12</span><span class="status s-queue">GESENDET</span></div>
+            <div class="wait" style="margin-top:8px">gerade abgesendet</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- KÜCHE / BEREICH -->
+      <section class="view" data-view="kueche">
+        <div class="app-top"><span class="name">Küche</span><span class="chip role">🍳 Bereich</span><span class="spacer"></span><span class="chip on">● Live</span></div>
+        <div class="pad">
+          <div class="board">
+            <div>
+              <h3>Neu (2)</h3>
+              <div class="ticket neu"><div class="hd"><span class="nr">Nr. 1045</span><span class="wait">0 min</span></div><div class="muted small">Kellner Max · Abholnr. 12</div><ul><li>1× Kotelett</li><li>2× Pommes</li></ul><button class="btn ghost sm block">Annehmen</button></div>
+              <div class="ticket neu"><div class="hd"><span class="nr">Nr. 1046</span><span class="wait">1 min</span></div><div class="muted small">Kellnerin Eva · Tisch 9</div><ul><li>1× Grillteller</li></ul><div class="note">⚠ ohne Zwiebel</div><button class="btn ghost sm block" style="margin-top:8px">Annehmen</button></div>
+            </div>
+            <div>
+              <h3>In Vorbereitung (1)</h3>
+              <div class="ticket prep"><div class="hd"><span class="nr">Nr. 1043</span><span class="wait late">7 min ⚠</span></div><div class="muted small">Kellner Max · Tisch 3</div><ul><li>2× Bratwürstel mit Brot</li></ul><button class="btn pri sm block">Fertig</button></div>
+            </div>
+            <div>
+              <h3>Fertig zur Abholung (1)</h3>
+              <div class="ticket fertig"><div class="hd"><span class="nr">Nr. 1042</span><span class="status s-ready">FERTIG</span></div><div class="muted small">Kellner Max · Tisch 7</div><ul><li>2× Bratwürstel</li></ul><div class="muted small">wartet auf Kellner …</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- GLOBALE ÜBERSICHT -->
+      <section class="view" data-view="global">
+        <div class="app-top"><span class="name">Globale Übersicht</span><span class="chip role">🛰 Supervisor</span><span class="spacer"></span><span class="chip on">● Live</span></div>
+        <div class="pad col">
+          <div class="kpi">
+            <div class="card"><div class="lbl">Offen</div><div class="v tabnum">7</div></div>
+            <div class="card"><div class="lbl">Abholbereit</div><div class="v tabnum" style="color:#6ee7a0">2</div></div>
+            <div class="card"><div class="lbl">Verzögert</div><div class="v tabnum" style="color:#ffd27a">1</div></div>
+            <div class="card"><div class="lbl">Umsatz heute</div><div class="v tabnum">€ 1.284</div></div>
+          </div>
+          <div class="card tbl-wrap">
+            <table class="mt">
+              <thead><tr><th>Nr.</th><th>Kellner</th><th>Tisch</th><th>Bereiche</th><th>Zahlung</th><th>Auslieferung</th><th>Zeit</th></tr></thead>
+              <tbody>
+                <tr><td><b>1042</b></td><td>Max</td><td>7</td><td><span class="areas"><span class="areatag ok">Bier✓</span><span class="areatag ok">Wein✓</span><span class="areatag ok">Küche✓</span><span class="areatag ok">Kaffee✓</span></span></td><td><span class="status s-pay">OFFEN</span></td><td><span class="status s-ready">BEREIT</span></td><td class="tabnum">6 min</td></tr>
+                <tr><td><b>1043</b></td><td>Max</td><td>3</td><td><span class="areas"><span class="areatag ok">Bier✓</span><span class="areatag busy">Küche…</span></span></td><td><span class="status s-pay">OFFEN</span></td><td><span class="status s-queue">–</span></td><td class="tabnum late" style="color:#ff9d9d">7 min ⚠</td></tr>
+                <tr><td><b>1046</b></td><td>Eva</td><td>9</td><td><span class="areas"><span class="areatag busy">Küche…</span></span></td><td><span class="status s-pay">OFFEN</span></td><td><span class="status s-queue">–</span></td><td class="tabnum">1 min</td></tr>
+                <tr><td><b>1041</b></td><td>Eva</td><td>2</td><td><span class="areas"><span class="areatag ok">Alle ✓</span></span></td><td><span class="status s-done">BEZAHLT</span></td><td><span class="status s-prep">ABGEHOLT</span></td><td class="tabnum">9 min</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- BEZAHLEN / AUSLIEFERN -->
+      <section class="view" data-view="bezahlen">
+        <div class="app-top"><span class="name">Bestellung Nr. 1042</span><span class="chip role">💶 Kasse / Kellner</span><span class="spacer"></span><span class="status s-ready">ABHOLBEREIT</span></div>
+        <div class="pad">
+          <div class="three" style="margin-bottom:12px">
+            <div class="stat-box"><div class="lbl">Zubereitung</div><span class="status s-ready">FERTIG</span></div>
+            <div class="stat-box"><div class="lbl">Zahlung</div><span class="status s-pay">OFFEN</span></div>
+            <div class="stat-box"><div class="lbl">Auslieferung</div><span class="status s-queue">OFFEN</span></div>
+          </div>
+          <div class="flow">
+            <div class="card pad col">
+              <div class="lbl">Positionen</div>
+              <div class="between small"><span>2× Bier klein</span><span class="tabnum">€ 7,00</span></div>
+              <div class="between small"><span>1× Spritzer</span><span class="tabnum">€ 3,80</span></div>
+              <div class="between small"><span>2× Bratwürstel</span><span class="tabnum">€ 9,00</span></div>
+              <div class="between small"><span>1× Kaffee</span><span class="tabnum">€ 2,60</span></div>
+              <div class="between" style="border-top:1px solid var(--line);padding-top:8px"><span class="lbl">Gesamt</span><span class="tabnum" style="font-size:20px;font-weight:800">€ 22,40</span></div>
+            </div>
+            <div class="card pad col">
+              <div class="lbl">Bar erhalten</div>
+              <input class="f tabnum" style="text-align:right;font-size:18px" value="50,00">
+              <div class="keypad">
+                <button class="k">1</button><button class="k">2</button><button class="k">3</button>
+                <button class="k">4</button><button class="k">5</button><button class="k">6</button>
+                <button class="k">7</button><button class="k">8</button><button class="k">9</button>
+                <button class="k">,</button><button class="k">0</button><button class="k">⌫</button>
+              </div>
+              <div class="between" style="background:rgba(22,163,74,.14);border-radius:11px;padding:9px 12px"><span>Rückgeld</span><span class="tabnum" style="font-weight:800;color:#8ff0b4">€ 27,60</span></div>
+            </div>
+          </div>
+          <div class="row" style="margin-top:12px;flex-wrap:wrap">
+            <button class="btn ghost" style="flex:1">Zahlung erfassen (Bezahlt)</button>
+            <button class="btn warn" style="flex:1">Abgeholt</button>
+            <button class="btn pri" style="flex:1">Ausgeliefert → Abschließen</button>
+          </div>
+          <p class="muted small" style="text-align:center;margin-top:8px">Abschluss erst, wenn <b>bezahlt</b> UND <b>ausgeliefert</b> · jede Aktion serverseitig geprüft</p>
+        </div>
+      </section>
+
+      <!-- ADMIN -->
+      <section class="view" data-view="admin">
+        <div class="app-top"><span class="name">Verwaltung</span><span class="chip role">🛠 Admin</span><span class="spacer"></span></div>
+        <div class="pad flow">
+          <div class="card pad col">
+            <div class="between"><span class="lbl">Benutzer &amp; Rollen</span><button class="btn pri sm">+ Benutzer</button></div>
+            <div class="between small"><span>👤 Max · <span class="muted">Kellner</span></span><span class="status s-prep">darf zahlen</span></div>
+            <div class="between small"><span>👤 Eva · <span class="muted">Kellner</span></span><span class="muted">Standard</span></div>
+            <div class="between small"><span>🍳 Anna · <span class="muted">Bereich: Küche</span></span></div>
+            <div class="between small"><span>🍺 Tom · <span class="muted">Bereich: Bier</span></span></div>
+            <div class="between small"><span>💶 Lisa · <span class="muted">Kasse</span></span><span class="status s-cancel">darf stornieren</span></div>
+          </div>
+          <div class="card pad col">
+            <div class="lbl">Produkt → Arbeitsbereich</div>
+            <div class="between small"><span>Bier klein / groß</span><select class="f" style="max-width:150px"><option>Bierausgabe</option></select></div>
+            <div class="between small"><span>Weißwein / Spritzer</span><select class="f" style="max-width:150px"><option>Weinausgabe</option></select></div>
+            <div class="between small"><span>Bratwürstel / Kotelett</span><select class="f" style="max-width:150px"><option>Küche</option></select></div>
+            <div class="between small"><span>Kaffee / Kuchen</span><select class="f" style="max-width:150px"><option>Kaffee &amp; Kuchen</option></select></div>
+            <div class="between small"><span>Obstler / Schnaps</span><select class="f" style="max-width:150px"><option>Schnapsausgabe</option></select></div>
+            <p class="muted small" style="margin:4px 0 0">Zuordnung frei konfigurierbar · nicht im Code fixiert</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <p class="caption">Oben Ansicht wählen · rechts Gerät (Handy / Tablet / Desktop) umschalten. Reiner Design-Prototyp – noch keine Funktion.</p>
+</div>
+
+<script>
+  (function () {
+    var frame = document.getElementById('frame');
+    var views = document.getElementById('views');
+    var devs = document.getElementById('devs');
+    function show(v) {
+      frame.querySelectorAll('.view').forEach(function (s) { s.classList.toggle('active', s.dataset.view === v); });
+      views.querySelectorAll('.pill').forEach(function (p) { p.setAttribute('aria-pressed', String(p.dataset.v === v)); });
+    }
+    views.addEventListener('click', function (e) { var b = e.target.closest('.pill'); if (b) show(b.dataset.v); });
+    devs.addEventListener('click', function (e) {
+      var b = e.target.closest('.pill'); if (!b) return;
+      frame.dataset.dev = b.dataset.d;
+      devs.querySelectorAll('.pill').forEach(function (p) { p.setAttribute('aria-pressed', String(p === b)); });
+    });
+  })();
+</script>
