@@ -9,9 +9,13 @@ export const dynamic = "force-dynamic";
 
 const UpdateSchema = z.object({
   benutzername: z.string().trim().min(1).max(100).optional(),
+  anzeigename: z.string().trim().max(100).nullable().optional(),
   passwort: z.string().min(4).max(200).optional(), // gesetzt = Passwort zurücksetzen
-  rolle: z.enum(["ADMIN", "KASSA"]).optional(),
+  rolle: z.enum(["ADMIN", "KELLNER", "BEREICH", "KASSA", "SUPERVISOR"]).optional(),
+  darfZahlen: z.boolean().optional(),
+  darfStornieren: z.boolean().optional(),
   aktiv: z.boolean().optional(),
+  arbeitsbereichIds: z.array(z.string().min(1)).optional(),
 });
 
 /** Prüft, ob nach der Änderung noch mindestens ein aktiver ADMIN übrig bliebe. */
@@ -40,22 +44,35 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     // Aussperr-Schutz: den letzten aktiven Admin nicht deaktivieren oder herabstufen.
     const wirdInaktiv = daten.aktiv === false && ziel.aktiv;
-    const verliertAdmin = daten.rolle === "KASSA" && ziel.rolle === "ADMIN";
+    const verliertAdmin = daten.rolle !== undefined && daten.rolle !== "ADMIN" && ziel.rolle === "ADMIN";
     if ((wirdInaktiv || verliertAdmin) && (await letzterAdminBetroffen(id))) {
       return fehler("Der letzte aktive Administrator kann nicht deaktiviert oder herabgestuft werden.", 409);
     }
 
     const data: Prisma.BenutzerUpdateInput = {};
     if (daten.benutzername !== undefined) data.benutzername = daten.benutzername;
+    if (daten.anzeigename !== undefined) data.anzeigename = daten.anzeigename;
     if (daten.rolle !== undefined) data.rolle = daten.rolle;
+    if (daten.darfZahlen !== undefined) data.darfZahlen = daten.darfZahlen;
+    if (daten.darfStornieren !== undefined) data.darfStornieren = daten.darfStornieren;
     if (daten.aktiv !== undefined) data.aktiv = daten.aktiv;
     if (daten.passwort !== undefined) data.passwortHash = hashPasswort(daten.passwort);
 
     try {
-      const benutzer = await prisma.benutzer.update({
-        where: { id },
-        data,
-        select: { id: true, benutzername: true, rolle: true, aktiv: true },
+      const benutzer = await prisma.$transaction(async (tx) => {
+        if (daten.arbeitsbereichIds !== undefined) {
+          await tx.benutzerArbeitsbereich.deleteMany({ where: { benutzerId: id } });
+          if (daten.arbeitsbereichIds.length > 0) {
+            await tx.benutzerArbeitsbereich.createMany({
+              data: daten.arbeitsbereichIds.map((arbeitsbereichId) => ({ benutzerId: id, arbeitsbereichId })),
+            });
+          }
+        }
+        return tx.benutzer.update({
+          where: { id },
+          data,
+          select: { id: true, benutzername: true, rolle: true, aktiv: true },
+        });
       });
       return ok(benutzer);
     } catch (e) {
