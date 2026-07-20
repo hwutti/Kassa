@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifyToken } from "@/lib/session";
 
-// Schützt den Administrationsbereich (Seiten + API). Läuft in der Edge-Runtime,
+// Schützt Adminbereich + rollenspezifische Bereiche. Läuft in der Edge-Runtime,
 // nutzt daher nur den JWT-Kern aus session.ts (kein next/headers).
 
 export async function middleware(req: NextRequest) {
@@ -10,28 +10,41 @@ export async function middleware(req: NextRequest) {
   const session = token ? await verifyToken(token) : null;
   const istLoginSeite = pathname === "/admin/login";
 
-  // Admin-API: ohne gültige Session 401.
+  // Admin-API: gültige Session + Rolle ADMIN.
   if (pathname.startsWith("/api/admin")) {
-    if (!session) {
-      return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
-    }
+    if (!session) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+    if (session.rolle !== "ADMIN") return NextResponse.json({ error: "Kein Zugriff." }, { status: 403 });
     return NextResponse.next();
   }
 
-  // Admin-Seiten (außer Login): ohne Session zur Login-Seite umleiten.
-  if (pathname.startsWith("/admin") && !istLoginSeite) {
-    if (!session) {
-      const url = req.nextUrl.clone();
-      url.pathname = "/admin/login";
-      url.search = `?weiter=${encodeURIComponent(pathname)}`;
-      return NextResponse.redirect(url);
-    }
+  // Rollen-APIs: gültige Session (Feinprüfung im Handler).
+  if (pathname.startsWith("/api/kellner") || pathname.startsWith("/api/bereich") || pathname.startsWith("/api/uebersicht")) {
+    if (!session) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+    return NextResponse.next();
   }
 
-  // Bereits angemeldet + Login-Seite: weiter zum Adminbereich.
+  // Geschützte Seiten -> ohne Session zur Login-Seite.
+  const geschuetzteSeite =
+    (pathname.startsWith("/admin") && !istLoginSeite) ||
+    pathname.startsWith("/kellner") ||
+    pathname.startsWith("/bereich") ||
+    pathname.startsWith("/uebersicht");
+  if (geschuetzteSeite && !session) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/admin/login";
+    url.search = `?weiter=${encodeURIComponent(pathname)}`;
+    return NextResponse.redirect(url);
+  }
+  // Adminseiten nur für ADMIN.
+  if (pathname.startsWith("/admin") && !istLoginSeite && session && session.rolle !== "ADMIN") {
+    const url = req.nextUrl.clone();
+    url.pathname = "/kellner";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
   if (istLoginSeite && session) {
     const url = req.nextUrl.clone();
-    url.pathname = "/admin";
+    url.pathname = session.rolle === "ADMIN" ? "/admin" : session.rolle === "BEREICH" ? "/bereich" : session.rolle === "SUPERVISOR" ? "/uebersicht" : "/kellner";
     url.search = "";
     return NextResponse.redirect(url);
   }
@@ -40,5 +53,14 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/api/admin/:path*",
+    "/kellner/:path*",
+    "/bereich/:path*",
+    "/uebersicht/:path*",
+    "/api/kellner/:path*",
+    "/api/bereich/:path*",
+    "/api/uebersicht/:path*",
+  ],
 };

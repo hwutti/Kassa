@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { startseiteFuer } from "@/lib/rollen";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const weiter = params.get("weiter") || "/admin";
+  const weiter = params.get("weiter");
 
   const [benutzername, setBenutzername] = useState("");
   const [passwort, setPasswort] = useState("");
@@ -38,7 +39,13 @@ function LoginForm() {
         setFehler(info.error ?? "Anmeldung fehlgeschlagen.");
         return;
       }
-      router.replace(weiter.startsWith("/admin") ? weiter : "/admin");
+      const info = await res.json().catch(() => ({}));
+      const rolle: string = info?.benutzer?.rolle ?? "ADMIN";
+      const ziel =
+        weiter && weiter.startsWith("/")
+          ? weiter
+          : startseiteFuer(rolle);
+      router.replace(ziel);
       router.refresh();
     } catch {
       setFehler("Netzwerkfehler. Bitte erneut versuchen.");
@@ -52,8 +59,8 @@ function LoginForm() {
       <form onSubmit={anmelden} className="card w-full max-w-sm p-6 space-y-4">
         <div className="text-center">
           <div className="text-3xl mb-1">🧾</div>
-          <h1 className="text-xl font-semibold">Administration</h1>
-          <p className="text-sm text-neutral-400">Bitte anmelden</p>
+          <h1 className="text-xl font-semibold">Anmelden</h1>
+          <p className="text-sm text-neutral-400">Kellner · Bereich · Kasse · Administration</p>
         </div>
 
         <label className="block">

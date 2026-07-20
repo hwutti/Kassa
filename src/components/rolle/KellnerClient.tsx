@@ -1,0 +1,304 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { jsonFetch } from "@/lib/client";
+import { formatCent } from "@/lib/money";
+import { RollenHeader } from "@/components/rolle/RollenHeader";
+import { useDialog } from "@/components/ui/DialogProvider";
+import { BESTELL_STATUS_LABEL } from "@/lib/statuslogik";
+
+type Kat = { id: string; name: string; farbe: string | null; icon: string | null };
+type Prod = { id: string; name: string; preisCent: number; icon: string | null; kategorieId: string };
+type Pos = { produktId: string; name: string; preisCent: number; menge: number };
+type MeineBestellung = {
+  id: string;
+  nummer: number;
+  tisch: string | null;
+  gast: string | null;
+  abholnummer: string | null;
+  summeCent: number;
+  bestellStatus: string;
+  zahlungStatus: string;
+  auslieferungStatus: string;
+  bereiche: { name: string; status: string }[];
+};
+
+function uuid() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+export function KellnerClient() {
+  const dialog = useDialog();
+  const [tab, setTab] = useState<"neu" | "meine">("neu");
+
+  // Produkte / Warenkorb
+  const [kategorien, setKategorien] = useState<Kat[]>([]);
+  const [produkte, setProdukte] = useState<Prod[]>([]);
+  const [katFilter, setKatFilter] = useState<string | null>(null);
+  const [korb, setKorb] = useState<Record<string, Pos>>({});
+  const [tisch, setTisch] = useState("");
+  const [gast, setGast] = useState("");
+  const [notiz, setNotiz] = useState("");
+  const [senden, setSenden] = useState(false);
+  const clientRef = useRef(uuid());
+
+  // Meine Bestellungen
+  const [meine, setMeine] = useState<MeineBestellung[]>([]);
+  const [fehler, setFehler] = useState<string | null>(null);
+
+  useEffect(() => {
+    jsonFetch<{ kategorien: Kat[]; produkte: Prod[] }>("/api/kellner/produkte")
+      .then((d) => {
+        setKategorien(d.kategorien);
+        setProdukte(d.produkte);
+      })
+      .catch((e) => setFehler((e as Error).message));
+  }, []);
+
+  const ladeMeine = useCallback(async () => {
+    try {
+      setMeine(await jsonFetch<MeineBestellung[]>("/api/kellner/bestellungen"));
+    } catch (e) {
+      setFehler((e as Error).message);
+    }
+  }, []);
+  useEffect(() => {
+    ladeMeine();
+    const iv = window.setInterval(ladeMeine, 4000);
+    return () => window.clearInterval(iv);
+  }, [ladeMeine]);
+
+  const gefiltert = useMemo(
+    () => produkte.filter((p) => !katFilter || p.kategorieId === katFilter),
+    [produkte, katFilter],
+  );
+  const positionen = Object.values(korb);
+  const summe = positionen.reduce((s, p) => s + p.preisCent * p.menge, 0);
+  const anzahl = positionen.reduce((s, p) => s + p.menge, 0);
+
+  function plus(p: Prod) {
+    setKorb((k) => ({
+      ...k,
+      [p.id]: k[p.id]
+        ? { ...k[p.id], menge: k[p.id].menge + 1 }
+        : { produktId: p.id, name: p.name, preisCent: p.preisCent, menge: 1 },
+    }));
+  }
+  function menge(id: string, d: number) {
+    setKorb((k) => {
+      const pos = k[id];
+      if (!pos) return k;
+      const m = pos.menge + d;
+      if (m <= 0) {
+        const rest = { ...k };
+        delete rest[id];
+        return rest;
+      }
+      return { ...k, [id]: { ...pos, menge: m } };
+    });
+  }
+
+  async function absenden() {
+    if (anzahl === 0 || senden) return;
+    setSenden(true);
+    setFehler(null);
+    try {
+      await jsonFetch("/api/kellner/bestellungen", {
+        method: "POST",
+        body: JSON.stringify({
+          clientRef: clientRef.current,
+          tisch: tisch.trim() || null,
+          gast: gast.trim() || null,
+          notiz: notiz.trim() || null,
+          positionen: positionen.map((p) => ({ produktId: p.produktId, menge: p.menge })),
+        }),
+      });
+      clientRef.current = uuid();
+      setKorb({});
+      setTisch("");
+      setGast("");
+      setNotiz("");
+      setTab("meine");
+      ladeMeine();
+    } catch (e) {
+      setFehler((e as Error).message);
+    } finally {
+      setSenden(false);
+    }
+  }
+
+  async function aktion(id: string, pfad: string, body?: unknown) {
+    try {
+      await jsonFetch(`/api/bestellungen/${id}/${pfad}`, { method: "POST", body: JSON.stringify(body ?? {}) });
+      ladeMeine();
+    } catch (e) {
+      await dialog.alert({ titel: "Fehler", text: (e as Error).message });
+    }
+  }
+  async function kassieren(b: MeineBestellung) {
+    const eingabe = await dialog.prompt({
+      titel: `Zahlung Nr. ${b.nummer}`,
+      text: `Gesamt ${formatCent(b.summeCent)}. Erhaltenen Betrag (€) eingeben (leer = passend):`,
+      platzhalter: "z. B. 50,00",
+      bestaetigenText: "Bezahlt",
+    });
+    if (eingabe === null) return;
+    const gegebenCent =
+      eingabe.trim() === "" ? null : Math.round(Number(eingabe.replace(",", ".")) * 100);
+    aktion(b.id, "zahlung", { gegebenCent: Number.isFinite(gegebenCent as number) ? gegebenCent : null });
+  }
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0">
+      <RollenHeader titel="Kellner">
+        <div className="flex gap-1">
+          <button className={`pill-tab ${tab === "neu" ? "on" : ""}`} onClick={() => setTab("neu")}>
+            Neue Bestellung
+          </button>
+          <button className={`pill-tab ${tab === "meine" ? "on" : ""}`} onClick={() => setTab("meine")}>
+            Meine ({meine.length})
+          </button>
+        </div>
+      </RollenHeader>
+
+      {fehler && <p className="text-red-300 text-sm px-3 pt-2">{fehler}</p>}
+
+      {tab === "neu" ? (
+        <div className="flex-1 flex min-h-0">
+          <main className="flex-1 min-w-0 flex flex-col">
+            <div className="shrink-0 p-3 border-b border-neutral-800 flex gap-2 overflow-x-auto">
+              <button className={`chip-cat ${!katFilter ? "on" : ""}`} onClick={() => setKatFilter(null)}>
+                Alle
+              </button>
+              {kategorien.map((k) => (
+                <button key={k.id} className={`chip-cat ${katFilter === k.id ? "on" : ""}`} onClick={() => setKatFilter(k.id)}>
+                  {k.icon} {k.name}
+                </button>
+              ))}
+            </div>
+            <div className="flex-1 overflow-y-auto p-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {gefiltert.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => plus(p)}
+                    className={`card p-3 text-left active:scale-[.98] transition ${korb[p.id] ? "ring-2 ring-brand-600 border-brand-600" : ""}`}
+                  >
+                    <div className="flex items-start gap-2">
+                      {p.icon && <span className="text-2xl leading-none">{p.icon}</span>}
+                      <span className="font-medium leading-tight">{p.name}</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-brand-50 font-semibold tabular-nums">{formatCent(p.preisCent)}</span>
+                      {korb[p.id] && <span className="badge bg-brand-600 text-white">{korb[p.id].menge}×</span>}
+                    </div>
+                  </button>
+                ))}
+                {gefiltert.length === 0 && <p className="text-neutral-400 col-span-full p-4">Keine Produkte mit Preis.</p>}
+              </div>
+            </div>
+          </main>
+
+          <aside className="w-80 shrink-0 border-l border-neutral-800 flex flex-col">
+            <div className="p-3 border-b border-neutral-800 space-y-2">
+              <input className="input" placeholder="Tisch / Abholnr." value={tisch} onChange={(e) => setTisch(e.target.value)} />
+              <input className="input" placeholder="Gast (optional)" value={gast} onChange={(e) => setGast(e.target.value)} />
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
+              {positionen.length === 0 ? (
+                <p className="text-neutral-500 text-sm text-center p-4">Produkte antippen …</p>
+              ) : (
+                positionen.map((p) => (
+                  <div key={p.produktId} className="card p-2 flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate font-medium">{p.name}</div>
+                      <div className="text-xs text-neutral-400 tabular-nums">
+                        {formatCent(p.preisCent)} × {p.menge}
+                      </div>
+                    </div>
+                    <button className="btn-ghost h-8 w-8 !px-0 !min-h-0" onClick={() => menge(p.produktId, -1)}>–</button>
+                    <span className="w-6 text-center tabular-nums">{p.menge}</span>
+                    <button className="btn-ghost h-8 w-8 !px-0 !min-h-0" onClick={() => menge(p.produktId, +1)}>+</button>
+                  </div>
+                ))
+              )}
+              {positionen.length > 0 && (
+                <input className="input" placeholder="Notiz (optional)" value={notiz} onChange={(e) => setNotiz(e.target.value)} />
+              )}
+            </div>
+            <div className="shrink-0 border-t border-neutral-800 p-3 space-y-2">
+              <div className="flex justify-between items-baseline">
+                <span className="text-neutral-300">Gesamt</span>
+                <span className="text-xl font-bold tabular-nums">{formatCent(summe)}</span>
+              </div>
+              <button className="btn-primary w-full" onClick={absenden} disabled={anzahl === 0 || senden}>
+                {senden ? "Sende …" : `Bestellung absenden (${anzahl})`}
+              </button>
+            </div>
+          </aside>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {meine.length === 0 && <p className="text-neutral-400">Keine offenen Bestellungen.</p>}
+          {meine.map((b) => {
+            const bereit = b.auslieferungStatus === "READY_FOR_PICKUP";
+            const abgeholt = b.auslieferungStatus === "COLLECTED";
+            const bezahlt = b.zahlungStatus === "PAID";
+            return (
+              <div key={b.id} className={`card p-3 border-l-4 ${bereit ? "border-brand-600" : abgeholt ? "border-blue-500" : "border-neutral-700"}`}>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="font-semibold">
+                    Nr. {b.nummer}
+                    {b.tisch ? ` · Tisch ${b.tisch}` : b.abholnummer ? ` · Nr. ${b.abholnummer}` : ""}
+                  </span>
+                  <span className={`badge ${bereit ? "bg-brand-600/20 text-brand-50" : "bg-neutral-700 text-neutral-300"}`}>
+                    {BESTELL_STATUS_LABEL[b.bestellStatus] ?? b.bestellStatus}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {b.bereiche.map((a, i) => (
+                    <span
+                      key={i}
+                      className={`text-xs rounded px-1.5 py-0.5 border ${
+                        a.status === "READY" || a.status === "COLLECTED"
+                          ? "border-brand-600/50 text-brand-50"
+                          : "border-blue-500/50 text-blue-200"
+                      }`}
+                    >
+                      {a.name}
+                      {a.status === "READY" || a.status === "COLLECTED" ? " ✓" : " …"}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-neutral-400 tabular-nums">
+                    {formatCent(b.summeCent)} · {bezahlt ? "bezahlt" : "Zahlung offen"}
+                  </span>
+                  <div className="ml-auto flex gap-2">
+                    {bereit && (
+                      <button className="btn-primary py-1.5 text-sm" onClick={() => aktion(b.id, "abholen")}>
+                        Abholen
+                      </button>
+                    )}
+                    {abgeholt && (
+                      <button className="btn-primary py-1.5 text-sm" onClick={() => aktion(b.id, "ausliefern")}>
+                        Ausliefern
+                      </button>
+                    )}
+                    {!bezahlt && (bereit || abgeholt) && (
+                      <button className="btn-ghost py-1.5 text-sm" onClick={() => kassieren(b)}>
+                        Kassieren
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -18,6 +18,14 @@ const NAV = [
   { href: "/admin/einstellungen", label: "Einstellungen" },
 ];
 
+// Rollen-Arbeitsbereiche (auch für Admin erreichbar).
+const ROLLEN_NAV = [
+  { href: "/kellner", label: "Kellner" },
+  { href: "/bereich", label: "Bereich" },
+  { href: "/uebersicht", label: "Übersicht" },
+  { href: "/kasse", label: "Schnell-Kasse" },
+];
+
 export function AdminChrome({ benutzer, children }: { benutzer: string; children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -58,6 +66,18 @@ export function AdminChrome({ benutzer, children }: { benutzer: string; children
               </Link>
             );
           })}
+        </nav>
+        <nav className="px-2 pb-2 flex gap-1 overflow-x-auto border-t border-neutral-800 pt-2">
+          <span className="shrink-0 px-2 py-2 text-xs uppercase tracking-wide text-neutral-500">Bereiche</span>
+          {ROLLEN_NAV.map((n) => (
+            <Link
+              key={n.href}
+              href={n.href}
+              className="shrink-0 rounded-lg px-3 py-2 text-sm text-brand-50/80 hover:bg-neutral-800"
+            >
+              {n.label} →
+            </Link>
+          ))}
         </nav>
       </header>
       <main className="flex-1 p-3 sm:p-5 max-w-5xl w-full mx-auto">{children}</main>
