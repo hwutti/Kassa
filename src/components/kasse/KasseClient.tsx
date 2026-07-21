@@ -35,6 +35,8 @@ export function KasseClient() {
   const [bestellungen, setBestellungen] = useState<OffeneBestellung[]>([]);
   const [heuteKassiert, setHeuteKassiert] = useState(0);
   const [titel, setTitel] = useState("Kassa");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [untertitel, setUntertitel] = useState<string | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
 
   const [zahlFuer, setZahlFuer] = useState<OffeneBestellung | null>(null);
@@ -61,8 +63,14 @@ export function KasseClient() {
   useLive(laden);
 
   useEffect(() => {
-    jsonFetch<{ titel?: string }>("/api/konfiguration")
-      .then((k) => k.titel && setTitel(k.titel))
+    jsonFetch<{ titel?: string; logoUrl?: string | null; untertitel?: string | null; aktiveVeranstaltung?: { name: string } | null }>(
+      "/api/konfiguration",
+    )
+      .then((k) => {
+        if (k.titel) setTitel(k.titel);
+        setLogoUrl(k.logoUrl ?? null);
+        setUntertitel(k.aktiveVeranstaltung?.name ?? k.untertitel ?? null);
+      })
       .catch(() => undefined);
     jsonFetch<{ sumupAffiliateKey: string | null; bonAutoDruck: boolean }>("/api/kasse/konfig")
       .then((k) => {
@@ -84,8 +92,12 @@ export function KasseClient() {
       // Beleg-Daten für den optionalen Bondruck merken.
       const bon: BonDaten = {
         titel,
+        untertitel,
+        logoUrl,
         nummer: zahlFuer.nummer,
         datum: new Date().toLocaleString("de-AT"),
+        verkaeufer: zahlFuer.verkaeufer,
+        tisch: zahlFuer.tisch ?? zahlFuer.abholnummer,
         positionen: zahlFuer.positionen,
         summeCent: zahlFuer.summeCent,
         art,
