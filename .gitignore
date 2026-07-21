@@ -38,3 +38,4 @@ next-env.d.ts
 test.db
 test.db-journal
 test-dev.log
+test-start.log

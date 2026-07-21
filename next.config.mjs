@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Zur Laufzeit hochgeladene Bilder (/uploads/*) über eine Route ausliefern,
+  // da Next.js im Produktionsbetrieb nur Build-Zeit-Dateien aus public/ serviert.
+  async rewrites() {
+    return [{ source: "/uploads/:name", destination: "/api/uploads/:name" }];
+  },
   async headers() {
     return [
       {
