@@ -15,6 +15,7 @@ type Auswertung = {
   jeVerkaufsbereich: NameUmsatz[];
   jeKategorie: NameUmsatz[];
   jeVeranstaltung: NameUmsatz[];
+  jeZahlungsart: NameUmsatz[];
   jeKellner: { name: string; umsatzCent: number; anzahl: number }[];
   jeProdukt: { name: string; umsatzCent: number; menge: number }[];
 };
@@ -150,7 +151,10 @@ export function AuswertungenAdmin() {
             </div>
           )}
 
-          <UmsatzListe titel="Umsatz je Veranstaltung" eintraege={daten.jeVeranstaltung} />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <UmsatzListe titel="Umsatz je Veranstaltung" eintraege={daten.jeVeranstaltung} />
+            <UmsatzListe titel="Umsatz nach Zahlungsart" eintraege={daten.jeZahlungsart} />
+          </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <UmsatzListe titel="Umsatz je Verkaufsbereich" eintraege={daten.jeVerkaufsbereich} />

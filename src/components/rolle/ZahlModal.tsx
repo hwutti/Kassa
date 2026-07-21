@@ -5,11 +5,19 @@ import { formatCent, parseEuroToCent } from "@/lib/money";
 import { Geldrechner } from "@/components/kasse/Geldrechner";
 
 type Position = { produktName: string; menge: number; einzelpreisCent: number; summeCent: number };
+export type Zahlungsart = "BAR" | "KARTE" | "GUTSCHEIN";
+
+const ARTEN: { wert: Zahlungsart; label: string; icon: string }[] = [
+  { wert: "BAR", label: "Bar", icon: "💶" },
+  { wert: "KARTE", label: "Karte", icon: "💳" },
+  { wert: "GUTSCHEIN", label: "Gutschein", icon: "🎟️" },
+];
 
 /**
  * Gemeinsames Bezahl-Modal für Verkäufer und zentrale Kassa.
- * Zeigt die Positionen + Geldrechner (Rückgeld) und meldet den erhaltenen Betrag
- * beim Bestätigen zurück. Kassiert wird über den zentralen Zahlungs-Endpunkt.
+ * Zahlungsart wählbar (Bar/Karte/Gutschein). Bei Bar zusätzlich Geldrechner mit
+ * Rückgeld; Karte/Gutschein gelten als passend. Kassiert wird über den zentralen
+ * Zahlungs-Endpunkt.
  */
 export function ZahlModal({
   nummer,
@@ -26,15 +34,16 @@ export function ZahlModal({
   laedt: boolean;
   fehler: string | null;
   onAbbrechen: () => void;
-  onBezahlen: (gegebenCent: number | null) => void;
+  onBezahlen: (gegebenCent: number | null, art: Zahlungsart) => void;
 }) {
+  const [art, setArt] = useState<Zahlungsart>("BAR");
   const [erhaltenText, setErhaltenText] = useState("");
   const erhaltenCent = parseEuroToCent(erhaltenText);
-  const zuWenig = erhaltenCent !== null && erhaltenCent < summeCent;
+  const zuWenig = art === "BAR" && erhaltenCent !== null && erhaltenCent < summeCent;
 
   function bezahlen() {
     if (zuWenig || laedt) return;
-    onBezahlen(erhaltenCent);
+    onBezahlen(art === "BAR" ? erhaltenCent : null, art);
   }
 
   return (
@@ -64,7 +73,31 @@ export function ZahlModal({
             <span className="text-2xl font-bold tabular-nums">{formatCent(summeCent)}</span>
           </div>
 
-          <Geldrechner summeCent={summeCent} erhaltenText={erhaltenText} onErhaltenChange={setErhaltenText} />
+          {/* Zahlungsart */}
+          <div className="grid grid-cols-3 gap-2">
+            {ARTEN.map((a) => (
+              <button
+                key={a.wert}
+                type="button"
+                onClick={() => setArt(a.wert)}
+                className={`rounded-lg border px-2 py-2 text-sm font-medium flex items-center justify-center gap-1 ${
+                  art === a.wert
+                    ? "bg-brand-600 border-brand-600 text-white"
+                    : "bg-neutral-800 border-neutral-700 text-neutral-200"
+                }`}
+              >
+                <span>{a.icon}</span> {a.label}
+              </button>
+            ))}
+          </div>
+
+          {art === "BAR" ? (
+            <Geldrechner summeCent={summeCent} erhaltenText={erhaltenText} onErhaltenChange={setErhaltenText} />
+          ) : (
+            <p className="text-sm text-neutral-400">
+              {art === "KARTE" ? "Kartenzahlung am Terminal durchführen, dann bestätigen." : "Gutschein entgegennehmen, dann bestätigen."}
+            </p>
+          )}
 
           {fehler && (
             <p role="alert" className="text-sm text-red-300 bg-red-950/50 rounded-lg px-3 py-2">
@@ -77,7 +110,13 @@ export function ZahlModal({
               Abbrechen
             </button>
             <button className="btn-primary flex-1" onClick={bezahlen} disabled={laedt || zuWenig}>
-              {laedt ? "Speichere …" : erhaltenText.trim() === "" ? "Bezahlt (passend)" : "Bezahlt"}
+              {laedt
+                ? "Speichere …"
+                : art !== "BAR"
+                  ? "Bezahlt"
+                  : erhaltenText.trim() === ""
+                    ? "Bezahlt (passend)"
+                    : "Bezahlt"}
             </button>
           </div>
         </div>

@@ -156,14 +156,14 @@ export function KellnerClient() {
       await dialog.alert({ titel: "Fehler", text: (e as Error).message });
     }
   }
-  async function bezahlen(gegebenCent: number | null) {
+  async function bezahlen(gegebenCent: number | null, art: string) {
     if (!zahlFuer || zahlLaedt) return;
     setZahlLaedt(true);
     setZahlFehler(null);
     try {
       await jsonFetch(`/api/bestellungen/${zahlFuer.id}/zahlung`, {
         method: "POST",
-        body: JSON.stringify({ gegebenCent }),
+        body: JSON.stringify({ gegebenCent, art }),
       });
       setZahlFuer(null);
       ladeMeine();

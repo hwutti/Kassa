@@ -60,10 +60,14 @@ export async function GET(req: Request) {
     const jeVeranstaltung = new Map<string, number>();
     const jeProdukt = new Map<string, { umsatzCent: number; menge: number }>();
     const jeKellnerMap = new Map<string, { umsatzCent: number; anzahl: number }>();
+    const jeZahlungsart = new Map<string, number>();
+    const zahlungsartLabel: Record<string, string> = { BAR: "Bar", KARTE: "Karte", GUTSCHEIN: "Gutschein" };
 
     for (const b of abgeschlossen) {
       const vName = b.veranstaltung?.name ?? "Ohne Veranstaltung";
       jeVeranstaltung.set(vName, (jeVeranstaltung.get(vName) ?? 0) + b.summeCent);
+      const zaName = zahlungsartLabel[b.zahlungsart] ?? b.zahlungsart;
+      jeZahlungsart.set(zaName, (jeZahlungsart.get(zaName) ?? 0) + b.summeCent);
       const kName = b.kellner?.anzeigename ?? b.kellner?.benutzername ?? "Direktverkauf";
       const kCur = jeKellnerMap.get(kName) ?? { umsatzCent: 0, anzahl: 0 };
       kCur.umsatzCent += b.summeCent;
@@ -108,6 +112,7 @@ export async function GET(req: Request) {
         jeVerkaufsbereich: sortMap(jeBereich),
         jeKategorie: sortMap(jeKategorie),
         jeVeranstaltung: sortMap(jeVeranstaltung),
+        jeZahlungsart: sortMap(jeZahlungsart),
         jeKellner: [...jeKellnerMap.entries()]
           .map(([name, v]) => ({ name, umsatzCent: v.umsatzCent, anzahl: v.anzahl }))
           .sort((a, b) => b.umsatzCent - a.umsatzCent),

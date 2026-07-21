@@ -8,6 +8,7 @@ import { InstallButton } from "@/components/kasse/InstallButton";
 import { ZahlModal } from "@/components/rolle/ZahlModal";
 import { BESTELL_STATUS_LABEL } from "@/lib/statuslogik";
 import { useLive } from "@/lib/useLive";
+import { druckeBon, type BonDaten } from "@/lib/bon";
 
 type Position = { produktName: string; menge: number; einzelpreisCent: number; summeCent: number; status: string };
 type OffeneBestellung = {
@@ -39,6 +40,7 @@ export function KasseClient() {
   const [zahlFuer, setZahlFuer] = useState<OffeneBestellung | null>(null);
   const [zahlLaedt, setZahlLaedt] = useState(false);
   const [zahlFehler, setZahlFehler] = useState<string | null>(null);
+  const [bonDaten, setBonDaten] = useState<BonDaten | null>(null);
 
   const laden = useCallback(async () => {
     try {
@@ -62,14 +64,25 @@ export function KasseClient() {
       .catch(() => undefined);
   }, []);
 
-  async function bezahlen(gegebenCent: number | null) {
+  async function bezahlen(gegebenCent: number | null, art: string) {
     if (!zahlFuer || zahlLaedt) return;
     setZahlLaedt(true);
     setZahlFehler(null);
     try {
-      await jsonFetch(`/api/bestellungen/${zahlFuer.id}/zahlung`, {
+      const res = await jsonFetch<{ rueckgeldCent: number | null }>(`/api/bestellungen/${zahlFuer.id}/zahlung`, {
         method: "POST",
-        body: JSON.stringify({ gegebenCent }),
+        body: JSON.stringify({ gegebenCent, art }),
+      });
+      // Beleg-Daten für den optionalen Bondruck merken.
+      setBonDaten({
+        titel,
+        nummer: zahlFuer.nummer,
+        datum: new Date().toLocaleString("de-AT"),
+        positionen: zahlFuer.positionen,
+        summeCent: zahlFuer.summeCent,
+        art,
+        gegebenCent,
+        rueckgeldCent: res?.rueckgeldCent ?? null,
       });
       setZahlFuer(null);
       laden();
@@ -168,6 +181,31 @@ export function KasseClient() {
           onAbbrechen={() => setZahlFuer(null)}
           onBezahlen={bezahlen}
         />
+      )}
+
+      {bonDaten && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="card w-full max-w-xs p-5 space-y-4 text-center">
+            <div className="mx-auto h-12 w-12 rounded-full flex items-center justify-center text-2xl bg-brand-600/20 text-brand-50">
+              ✓
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">Zahlung erfasst</h2>
+              <p className="text-sm text-neutral-400">
+                Nr. {bonDaten.nummer} · {formatCent(bonDaten.summeCent)}
+                {bonDaten.rueckgeldCent !== null ? ` · Rückgeld ${formatCent(bonDaten.rueckgeldCent)}` : ""}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button className="btn-ghost flex-1" onClick={() => setBonDaten(null)}>
+                Fertig
+              </button>
+              <button className="btn-primary flex-1" onClick={() => druckeBon(bonDaten)}>
+                Bon drucken
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
