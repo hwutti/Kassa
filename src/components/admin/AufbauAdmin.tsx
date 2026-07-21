@@ -499,7 +499,7 @@ function PlanAnsicht({
     }
     const mehrring = ringe.length > 1;
     const outerR = ringe[0].r;
-    const cx = outerR + 44, cy = outerR + 50;
+    const cx = outerR + 170, cy = outerR + 74;
 
     let idx = 0;
     const sitze: { x: number; y: number; s: Sitz }[] = [];
@@ -513,13 +513,22 @@ function PlanAnsicht({
       }
     }
 
-    // Sektions-Label am jeweils ersten Platz, leicht nach außen versetzt.
-    const labels: { x: number; y: number; text: string }[] = [];
+    // Sektions-Label an der Mittelachse jeder Gruppe, außerhalb des Bogens.
+    // Seitenabhängige Ausrichtung + leichte Versetzung, damit sich nichts überlappt.
+    const labels: { x: number; y: number; text: string; anchor: "start" | "middle" | "end" }[] = [];
     gruppen.forEach((g, gi) => {
-      const p = sitze[grenzen[gi]];
-      if (!p) return;
-      const dx = p.x - cx, dy = p.y - cy, len = Math.hypot(dx, dy) || 1;
-      labels.push({ x: p.x + (dx / len) * 22, y: p.y + (dy / len) * 22, text: g.label });
+      const pts = sitze.slice(grenzen[gi], grenzen[gi] + g.sitze.length);
+      if (!pts.length) return;
+      const ax = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+      const ay = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+      let dx = ax - cx, dy = ay - cy;
+      const len = Math.hypot(dx, dy) || 1;
+      dx /= len;
+      dy /= len;
+      const lr = outerR + 20 + (gi % 3) * 22;
+      const anchor: "start" | "middle" | "end" = dx < -0.25 ? "end" : dx > 0.25 ? "start" : "middle";
+      const text = g.label.length > 13 ? g.label.slice(0, 12) + "…" : g.label;
+      labels.push({ x: cx + dx * lr, y: cy + dy * lr, text, anchor });
     });
     // Trennlinien nur im Ein-Ring-Modus (bei mehreren Ringen genügen Farbe + Legende).
     const trenner: { x1: number; y1: number; x2: number; y2: number }[] = [];
@@ -532,7 +541,7 @@ function PlanAnsicht({
         k += g.sitze.length;
       }
     }
-    return { gruppen, sitze, trenner, labels, cx, cy, vbW: 2 * outerR + 88, vbH: outerR + 82 };
+    return { gruppen, sitze, trenner, labels, cx, cy, vbW: 2 * outerR + 340, vbH: outerR + 118 };
   }, [benutzer, bereiche, drucker, onPerson, onNeuPerson, onDrucker, onNeuDrucker]);
 
   const { sitze, trenner, labels, cx, cy, vbW, vbH, gruppen } = layout;
@@ -545,7 +554,7 @@ function PlanAnsicht({
             <line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke="#3f3f46" strokeWidth={1} strokeDasharray="2 5" />
           ))}
           {labels.map((l, i) => (
-            <text key={i} x={l.x} y={l.y} textAnchor="middle" fontSize={11} fill="#a3a3a3">{l.text}</text>
+            <text key={i} x={l.x} y={l.y} textAnchor={l.anchor} dominantBaseline="middle" fontSize={12} fill="#cbd5e1">{l.text}</text>
           ))}
           {sitze.map(({ x, y, s }) =>
             s.add ? (
