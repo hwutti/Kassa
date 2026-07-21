@@ -159,6 +159,10 @@ model Einstellung {
   logoUrl    String?
   logoHoehe  Int      @default(48) // Höhe des Logos im Header in Pixel
   design     String   @default("dunkel") // Hintergrund-Design (dunkel|glas|aurora|modern|cool|mitternacht)
+  // Kartenzahlung: SumUp-Affiliate-Key für den App-Absprung (optional).
+  sumupAffiliateKey String?
+  // Bon nach der Zahlung automatisch drucken (Systemdrucker/Browser).
+  bonAutoDruck Boolean @default(false)
   updatedAt  DateTime @updatedAt
 }
 

@@ -58,6 +58,7 @@ export function KellnerClient() {
   const [zahlFuer, setZahlFuer] = useState<MeineBestellung | null>(null);
   const [zahlLaedt, setZahlLaedt] = useState(false);
   const [zahlFehler, setZahlFehler] = useState<string | null>(null);
+  const [sumupKey, setSumupKey] = useState<string | null>(null);
 
   useEffect(() => {
     jsonFetch<{ kategorien: Kat[]; produkte: Prod[] }>("/api/kellner/produkte")
@@ -66,6 +67,9 @@ export function KellnerClient() {
         setProdukte(d.produkte);
       })
       .catch((e) => setFehler((e as Error).message));
+    jsonFetch<{ sumupAffiliateKey: string | null }>("/api/kasse/konfig")
+      .then((k) => setSumupKey(k.sumupAffiliateKey))
+      .catch(() => undefined);
   }, []);
 
   const ladeMeine = useCallback(async () => {
@@ -379,6 +383,7 @@ export function KellnerClient() {
           summeCent={zahlFuer.summeCent}
           laedt={zahlLaedt}
           fehler={zahlFehler}
+          sumupAffiliateKey={sumupKey}
           onAbbrechen={() => setZahlFuer(null)}
           onBezahlen={bezahlen}
         />

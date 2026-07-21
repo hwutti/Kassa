@@ -9,6 +9,8 @@ type Konfig = {
   logoUrl: string | null;
   logoHoehe: number;
   design: string;
+  sumupAffiliateKey: string | null;
+  bonAutoDruck: boolean;
 };
 
 const DESIGNS: { id: string; name: string; vorschau: string }[] = [
@@ -26,6 +28,8 @@ export function EinstellungenAdmin() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoHoehe, setLogoHoehe] = useState(48);
   const [design, setDesign] = useState("dunkel");
+  const [sumupKey, setSumupKey] = useState("");
+  const [bonAutoDruck, setBonAutoDruck] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [gespeichert, setGespeichert] = useState(false);
   const [ladeBild, setLadeBild] = useState(false);
@@ -38,6 +42,8 @@ export function EinstellungenAdmin() {
         setLogoUrl(k.logoUrl);
         setLogoHoehe(k.logoHoehe ?? 48);
         setDesign(k.design ?? "dunkel");
+        setSumupKey(k.sumupAffiliateKey ?? "");
+        setBonAutoDruck(Boolean(k.bonAutoDruck));
       })
       .catch((e) => setFehler((e as Error).message));
   }, []);
@@ -76,6 +82,8 @@ export function EinstellungenAdmin() {
           logoUrl,
           logoHoehe,
           design,
+          sumupAffiliateKey: sumupKey.trim() || null,
+          bonAutoDruck,
         }),
       });
       try {
@@ -192,6 +200,33 @@ export function EinstellungenAdmin() {
           onChange={(e) => setUntertitel(e.target.value)}
         />
       </label>
+
+      {/* Kartenzahlung + Bondruck */}
+      <div className="border-t border-neutral-800 pt-4 space-y-3">
+        <h3 className="font-semibold">Kasse &amp; Zahlung</h3>
+        <label className="block">
+          <span className="text-sm text-neutral-400">SumUp Affiliate-Key (für Kartenzahlung, optional)</span>
+          <input
+            className="input mt-1"
+            value={sumupKey}
+            onChange={(e) => setSumupKey(e.target.value)}
+            placeholder="aus dem SumUp-Entwicklerportal"
+            autoComplete="off"
+          />
+          <span className="text-[11px] text-neutral-500">
+            Leer lassen, wenn keine Kartenzahlung genutzt wird. Der Absprung öffnet die SumUp-App auf dem Gerät.
+          </span>
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            className="accent-brand-600 h-4 w-4"
+            checked={bonAutoDruck}
+            onChange={(e) => setBonAutoDruck(e.target.checked)}
+          />
+          <span className="text-sm">Bon nach der Zahlung automatisch drucken (Systemdrucker)</span>
+        </label>
+      </div>
 
       {fehler && <p className="text-red-300 text-sm">{fehler}</p>}
 

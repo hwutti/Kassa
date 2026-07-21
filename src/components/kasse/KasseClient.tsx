@@ -41,6 +41,8 @@ export function KasseClient() {
   const [zahlLaedt, setZahlLaedt] = useState(false);
   const [zahlFehler, setZahlFehler] = useState<string | null>(null);
   const [bonDaten, setBonDaten] = useState<BonDaten | null>(null);
+  const [sumupKey, setSumupKey] = useState<string | null>(null);
+  const [bonAutoDruck, setBonAutoDruck] = useState(false);
 
   const laden = useCallback(async () => {
     try {
@@ -62,6 +64,12 @@ export function KasseClient() {
     jsonFetch<{ titel?: string }>("/api/konfiguration")
       .then((k) => k.titel && setTitel(k.titel))
       .catch(() => undefined);
+    jsonFetch<{ sumupAffiliateKey: string | null; bonAutoDruck: boolean }>("/api/kasse/konfig")
+      .then((k) => {
+        setSumupKey(k.sumupAffiliateKey);
+        setBonAutoDruck(k.bonAutoDruck);
+      })
+      .catch(() => undefined);
   }, []);
 
   async function bezahlen(gegebenCent: number | null, art: string) {
@@ -74,7 +82,7 @@ export function KasseClient() {
         body: JSON.stringify({ gegebenCent, art }),
       });
       // Beleg-Daten für den optionalen Bondruck merken.
-      setBonDaten({
+      const bon: BonDaten = {
         titel,
         nummer: zahlFuer.nummer,
         datum: new Date().toLocaleString("de-AT"),
@@ -83,7 +91,9 @@ export function KasseClient() {
         art,
         gegebenCent,
         rueckgeldCent: res?.rueckgeldCent ?? null,
-      });
+      };
+      setBonDaten(bon);
+      if (bonAutoDruck) druckeBon(bon); // automatischer Bondruck (Systemdrucker)
       setZahlFuer(null);
       laden();
     } catch (e) {
@@ -178,6 +188,7 @@ export function KasseClient() {
           positionen={zahlFuer.positionen}
           laedt={zahlLaedt}
           fehler={zahlFehler}
+          sumupAffiliateKey={sumupKey}
           onAbbrechen={() => setZahlFuer(null)}
           onBezahlen={bezahlen}
         />

@@ -25,6 +25,7 @@ export function ZahlModal({
   positionen,
   laedt,
   fehler,
+  sumupAffiliateKey,
   onAbbrechen,
   onBezahlen,
 }: {
@@ -33,6 +34,7 @@ export function ZahlModal({
   positionen?: Position[];
   laedt: boolean;
   fehler: string | null;
+  sumupAffiliateKey?: string | null;
   onAbbrechen: () => void;
   onBezahlen: (gegebenCent: number | null, art: Zahlungsart) => void;
 }) {
@@ -44,6 +46,17 @@ export function ZahlModal({
   function bezahlen() {
     if (zuWenig || laedt) return;
     onBezahlen(art === "BAR" ? erhaltenCent : null, art);
+  }
+
+  function sumupOeffnen() {
+    if (!sumupAffiliateKey) return;
+    const total = (summeCent / 100).toFixed(2);
+    const url =
+      `sumupmerchant://pay/1.0?affiliate-key=${encodeURIComponent(sumupAffiliateKey)}` +
+      `&app-id=at.kirchtag.kasse&total=${total}&currency=EUR&title=${encodeURIComponent(`Bestellung Nr. ${nummer}`)}`;
+    // App-Absprung zur SumUp-App; nach Abschluss am Terminal kehrt der Kassier zurück
+    // und bestätigt hier mit „Bezahlt".
+    window.location.href = url;
   }
 
   return (
@@ -93,10 +106,19 @@ export function ZahlModal({
 
           {art === "BAR" ? (
             <Geldrechner summeCent={summeCent} erhaltenText={erhaltenText} onErhaltenChange={setErhaltenText} />
+          ) : art === "KARTE" ? (
+            <div className="space-y-2">
+              {sumupAffiliateKey ? (
+                <button type="button" className="btn-ghost w-full" onClick={sumupOeffnen} disabled={laedt}>
+                  💳 Mit SumUp öffnen ({formatCent(summeCent)})
+                </button>
+              ) : null}
+              <p className="text-sm text-neutral-400">
+                Kartenzahlung am Terminal durchführen, dann „Bezahlt" bestätigen.
+              </p>
+            </div>
           ) : (
-            <p className="text-sm text-neutral-400">
-              {art === "KARTE" ? "Kartenzahlung am Terminal durchführen, dann bestätigen." : "Gutschein entgegennehmen, dann bestätigen."}
-            </p>
+            <p className="text-sm text-neutral-400">Gutschein entgegennehmen, dann „Bezahlt" bestätigen.</p>
           )}
 
           {fehler && (

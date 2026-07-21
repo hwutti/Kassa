@@ -15,6 +15,8 @@ export async function GET() {
       logoUrl: e.logoUrl,
       logoHoehe: e.logoHoehe,
       design: e.design,
+      sumupAffiliateKey: e.sumupAffiliateKey,
+      bonAutoDruck: e.bonAutoDruck,
     });
   } catch (e) {
     return handleError(e);
@@ -27,6 +29,8 @@ const UpdateSchema = z.object({
   logoUrl: z.string().trim().max(300).nullable().optional(),
   logoHoehe: z.number().int().min(16).max(160).optional(),
   design: z.enum(["dunkel", "glas", "aurora", "modern", "cool", "mitternacht"]).optional(),
+  sumupAffiliateKey: z.string().trim().max(200).nullable().optional(),
+  bonAutoDruck: z.boolean().optional(),
 });
 
 /** PATCH /api/admin/konfiguration – Header-Logo, Größe, Titel und Design ändern. */
@@ -41,6 +45,8 @@ export async function PATCH(req: Request) {
       logoUrl: e.logoUrl,
       logoHoehe: e.logoHoehe,
       design: e.design,
+      sumupAffiliateKey: e.sumupAffiliateKey,
+      bonAutoDruck: e.bonAutoDruck,
     });
   } catch (e) {
     return handleError(e);
