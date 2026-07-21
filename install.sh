@@ -78,6 +78,24 @@ set -a; . ./.env; set +a
 log "Installiere Abhängigkeiten …"
 if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
+# --- 3b) Laufenden Dienst stoppen ------------------------------------------
+# Wichtig: Die App hält die SQLite-Datei offen (WAL-Modus). Migrationen brauchen
+# jedoch eine exklusive Sperre – läuft der Dienst noch, scheitert "migrate deploy"
+# mit "database is locked". Daher VOR jeder DB-Änderung sauber stoppen.
+# (Neustart erfolgt in Schritt 6 nach dem Build.)
+if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files "${SERVICE}.service" >/dev/null 2>&1; then
+  log "Stoppe Dienst '$SERVICE' für die Datenbank-Wartung …"
+  systemctl stop "$SERVICE" 2>/dev/null || true
+  # Kurz warten, bis die SQLite-Sperre (WAL/SHM) tatsächlich freigegeben ist.
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if [ -f prisma/prod.db-wal ] && command -v fuser >/dev/null 2>&1 && fuser prisma/prod.db >/dev/null 2>&1; then
+      sleep 1
+    else
+      break
+    fi
+  done
+fi
+
 # --- 4) Datenbank: Migrationen + Erst-Admin + optional Stammdaten -----------
 # Dieses Skript ist zugleich Installer UND Updater:
 #  - frische Installation  -> migrate deploy legt DB inkl. Verlauf an
