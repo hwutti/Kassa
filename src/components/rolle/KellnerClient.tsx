@@ -11,7 +11,7 @@ import { ZahlModal } from "@/components/rolle/ZahlModal";
 import { InstallButton } from "@/components/kasse/InstallButton";
 
 type Kat = { id: string; name: string; farbe: string | null; icon: string | null };
-type Prod = { id: string; name: string; preisCent: number; icon: string | null; kategorieId: string };
+type Prod = { id: string; name: string; preisCent: number; icon: string | null; barcode: string | null; kategorieId: string };
 type Pos = { produktId: string; name: string; preisCent: number; menge: number };
 type MeineBestellung = {
   id: string;
@@ -209,9 +209,20 @@ export function KellnerClient() {
               <input
                 type="search"
                 className="input"
-                placeholder="Produkt suchen …"
+                placeholder="Produkt suchen oder Barcode scannen …"
                 value={suche}
                 onChange={(e) => setSuche(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  const code = suche.trim();
+                  if (!code) return;
+                  // Barcode-Scanner tippt den Code + Enter: exakter Treffer -> in den Korb.
+                  const treffer = produkte.find((p) => p.barcode && p.barcode === code);
+                  if (treffer) {
+                    plus(treffer);
+                    setSuche("");
+                  }
+                }}
               />
               <div className="flex gap-2 overflow-x-auto">
                 <button className={`chip-cat ${!katFilter ? "on" : ""}`} onClick={() => setKatFilter(null)}>

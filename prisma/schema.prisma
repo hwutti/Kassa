@@ -55,6 +55,7 @@ model Produkt {
   sortierung      Int      @default(0)
   bildUrl         String?
   icon            String? // Emoji als einfache, lizenzfreie Darstellung
+  barcode         String?  @unique // EAN/Barcode für Scanner (optional, eindeutig)
   preisGeaendertAm DateTime? // Zeitpunkt der letzten Preisänderung
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

@@ -11,6 +11,7 @@ type Produkt = {
   beschreibung: string | null;
   icon: string | null;
   bildUrl: string | null;
+  barcode: string | null;
   preisCent: number | null;
   preisFehlt: boolean;
   aktiv: boolean;
@@ -28,6 +29,7 @@ type FormState = {
   beschreibung: string;
   icon: string;
   bildUrl: string | null;
+  barcode: string;
   preisText: string; // leer = Preis fehlt
   sortierung: number;
   aktiv: boolean;
@@ -41,6 +43,7 @@ const LEER: FormState = {
   beschreibung: "",
   icon: "",
   bildUrl: null,
+  barcode: "",
   preisText: "",
   sortierung: 0,
   aktiv: true,
@@ -94,6 +97,7 @@ export function ProdukteAdmin() {
       beschreibung: p.beschreibung ?? "",
       icon: p.icon ?? "",
       bildUrl: p.bildUrl,
+      barcode: p.barcode ?? "",
       preisText: p.preisCent === null ? "" : (p.preisCent / 100).toFixed(2).replace(".", ","),
       sortierung: p.sortierung,
       aktiv: p.aktiv,
@@ -120,6 +124,7 @@ export function ProdukteAdmin() {
       beschreibung: form.beschreibung.trim() || null,
       icon: form.icon.trim() || null,
       bildUrl: form.bildUrl,
+      barcode: form.barcode.trim() || null,
       preisCent,
       sortierung: form.sortierung,
       aktiv: form.aktiv,
@@ -332,6 +337,17 @@ function ProduktForm({
             className="input mt-1"
             value={form.beschreibung}
             onChange={(e) => setForm({ ...form, beschreibung: e.target.value })}
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-sm text-neutral-400">Barcode / EAN (optional, für Scanner)</span>
+          <input
+            className="input mt-1"
+            value={form.barcode}
+            onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+            placeholder="z. B. 9001234567890 – oder Feld fokussieren und scannen"
+            inputMode="numeric"
           />
         </label>
 

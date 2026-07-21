@@ -22,6 +22,7 @@ export async function GET() {
         preisCent: true,
         icon: true,
         bildUrl: true,
+        barcode: true,
         kategorieId: true,
         kategorie: { select: { id: true, name: true, farbe: true, icon: true, sortierung: true } },
         arbeitsbereiche: { select: { arbeitsbereichId: true, primaer: true } },
@@ -34,6 +35,7 @@ export async function GET() {
       preisCent: p.preisCent as number,
       icon: p.icon,
       bildUrl: p.bildUrl,
+      barcode: p.barcode,
       kategorieId: p.kategorieId,
     }));
 

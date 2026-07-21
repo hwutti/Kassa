@@ -10,6 +10,7 @@ const UpdateSchema = z.object({
   beschreibung: z.string().trim().max(500).nullable().optional(),
   icon: z.string().trim().max(40).nullable().optional(),
   bildUrl: z.string().trim().max(300).nullable().optional(),
+  barcode: z.string().trim().max(64).nullable().optional(),
   // preisCent: null => Preis entfernen ("Preis fehlt" -> verschwindet aus der Kasse).
   preisCent: z.number().int().min(0).nullable().optional(),
   aktiv: z.boolean().optional(),
@@ -38,6 +39,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (daten.beschreibung !== undefined) data.beschreibung = daten.beschreibung;
     if (daten.icon !== undefined) data.icon = daten.icon;
     if (daten.bildUrl !== undefined) data.bildUrl = daten.bildUrl;
+    if (daten.barcode !== undefined) data.barcode = daten.barcode || null;
     if (daten.aktiv !== undefined) data.aktiv = daten.aktiv;
     if (daten.archiviert !== undefined) data.archiviert = daten.archiviert;
     if (daten.sortierung !== undefined) data.sortierung = daten.sortierung;
@@ -89,6 +91,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     return ok(produkt);
   } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return fehler("Dieser Barcode ist bereits einem anderen Produkt zugeordnet.", 409);
+    }
     return handleError(e);
   }
 }

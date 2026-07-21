@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { ok, handleError } from "@/lib/api";
+import { ok, fehler, handleError } from "@/lib/api";
 import { istPreisGueltig } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,7 @@ export async function GET() {
         beschreibung: p.beschreibung,
         icon: p.icon,
         bildUrl: p.bildUrl,
+        barcode: p.barcode,
         preisCent: p.preisCent,
         preisFehlt: !istPreisGueltig(p.preisCent),
         preisGeaendertAm: p.preisGeaendertAm?.toISOString() ?? null,
@@ -48,6 +50,7 @@ const CreateSchema = z.object({
   beschreibung: z.string().trim().max(500).nullable().optional(),
   icon: z.string().trim().max(40).nullable().optional(),
   bildUrl: z.string().trim().max(300).nullable().optional(),
+  barcode: z.string().trim().max(64).nullable().optional(),
   // preisCent null erlaubt = "Preis fehlt".
   preisCent: z.number().int().min(0).nullable().optional(),
   aktiv: z.boolean().optional(),
@@ -68,6 +71,7 @@ export async function POST(req: Request) {
         beschreibung: daten.beschreibung ?? null,
         icon: daten.icon ?? null,
         bildUrl: daten.bildUrl ?? null,
+        barcode: daten.barcode || null,
         preisCent: daten.preisCent ?? null,
         preisGeaendertAm: hatPreis ? new Date() : null,
         aktiv: daten.aktiv ?? true,
@@ -83,6 +87,9 @@ export async function POST(req: Request) {
     });
     return ok(produkt, { status: 201 });
   } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return fehler("Dieser Barcode ist bereits einem anderen Produkt zugeordnet.", 409);
+    }
     return handleError(e);
   }
 }
