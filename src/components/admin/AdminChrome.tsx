@@ -14,16 +14,17 @@ const NAV = [
   { href: "/admin/veranstaltungen", label: "Veranstaltungen" },
   { href: "/admin/bestellungen", label: "Bestellungen" },
   { href: "/admin/auswertungen", label: "Auswertungen" },
+  { href: "/admin/aufbau", label: "Aufbau" },
   { href: "/admin/benutzer", label: "Benutzer" },
   { href: "/admin/einstellungen", label: "Einstellungen" },
 ];
 
 // Rollen-Arbeitsbereiche (auch für Admin erreichbar).
 const ROLLEN_NAV = [
-  { href: "/kellner", label: "Kellner" },
+  { href: "/kellner", label: "Verkauf" },
   { href: "/bereich", label: "Bereich" },
   { href: "/uebersicht", label: "Übersicht" },
-  { href: "/kasse", label: "Schnell-Kasse" },
+  { href: "/kasse", label: "Kassa" },
 ];
 
 export function AdminChrome({ benutzer, children }: { benutzer: string; children: ReactNode }) {
