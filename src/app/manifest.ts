@@ -46,7 +46,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     name,
     short_name: name.length <= 12 ? name : "Kasse",
     description: "Touch-Kassensystem für Verkaufsbereiche, Kategorien und Produkte.",
-    start_url: "/kasse",
+    start_url: "/",
     scope: "/",
     display: "standalone",
     orientation: "any",
@@ -56,7 +56,8 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     categories: ["business", "productivity", "shopping"],
     icons,
     shortcuts: [
-      { name: "Kasse", url: "/kasse" },
+      { name: "Verkauf", url: "/kellner" },
+      { name: "Kassa", url: "/kasse" },
       { name: "Administration", url: "/admin" },
     ],
   };

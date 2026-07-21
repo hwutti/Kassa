@@ -98,12 +98,6 @@ function LoginForm() {
         <button type="submit" className="btn-primary w-full" disabled={laedt}>
           {laedt ? "Anmelden …" : "Anmelden"}
         </button>
-
-        <p className="text-center">
-          <a href="/kasse" className="text-sm text-neutral-400 hover:text-neutral-200">
-            ← Zur Kasse
-          </a>
-        </p>
       </form>
     </div>
   );

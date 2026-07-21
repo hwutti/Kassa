@@ -18,7 +18,12 @@ export async function middleware(req: NextRequest) {
   }
 
   // Rollen-APIs: gültige Session (Feinprüfung im Handler).
-  if (pathname.startsWith("/api/kellner") || pathname.startsWith("/api/bereich") || pathname.startsWith("/api/uebersicht")) {
+  if (
+    pathname.startsWith("/api/kellner") ||
+    pathname.startsWith("/api/bereich") ||
+    pathname.startsWith("/api/uebersicht") ||
+    pathname.startsWith("/api/kasse")
+  ) {
     if (!session) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
     return NextResponse.next();
   }
@@ -28,7 +33,8 @@ export async function middleware(req: NextRequest) {
     (pathname.startsWith("/admin") && !istLoginSeite) ||
     pathname.startsWith("/kellner") ||
     pathname.startsWith("/bereich") ||
-    pathname.startsWith("/uebersicht");
+    pathname.startsWith("/uebersicht") ||
+    pathname.startsWith("/kasse");
   if (geschuetzteSeite && !session) {
     const url = req.nextUrl.clone();
     url.pathname = "/admin/login";
@@ -59,8 +65,10 @@ export const config = {
     "/kellner/:path*",
     "/bereich/:path*",
     "/uebersicht/:path*",
+    "/kasse/:path*",
     "/api/kellner/:path*",
     "/api/bereich/:path*",
     "/api/uebersicht/:path*",
+    "/api/kasse/:path*",
   ],
 };

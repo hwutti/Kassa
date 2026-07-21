@@ -42,3 +42,11 @@ export function darfKellner(rolle?: string): boolean {
 export function darfBereich(rolle?: string): boolean {
   return rolle === "ADMIN" || rolle === "BEREICH" || rolle === "SUPERVISOR";
 }
+/**
+ * Darf die zentrale Kassa bedienen (offene Bestellungen einsehen und abkassieren).
+ * Der Verkäufer (KELLNER) kassiert seine eigenen Bestellungen zusätzlich über das
+ * Benutzer-Recht `darfZahlen` – das wird pro Zahlung serverseitig geprüft.
+ */
+export function darfKassieren(rolle?: string): boolean {
+  return rolle === "ADMIN" || rolle === "KASSA" || rolle === "SUPERVISOR";
+}

@@ -7,6 +7,8 @@ import { RollenHeader } from "@/components/rolle/RollenHeader";
 import { useDialog } from "@/components/ui/DialogProvider";
 import { BESTELL_STATUS_LABEL } from "@/lib/statuslogik";
 import { useLive } from "@/lib/useLive";
+import { ZahlModal } from "@/components/rolle/ZahlModal";
+import { InstallButton } from "@/components/kasse/InstallButton";
 
 type Kat = { id: string; name: string; farbe: string | null; icon: string | null };
 type Prod = { id: string; name: string; preisCent: number; icon: string | null; kategorieId: string };
@@ -38,6 +40,7 @@ export function KellnerClient() {
   const [kategorien, setKategorien] = useState<Kat[]>([]);
   const [produkte, setProdukte] = useState<Prod[]>([]);
   const [katFilter, setKatFilter] = useState<string | null>(null);
+  const [suche, setSuche] = useState("");
   const [korb, setKorb] = useState<Record<string, Pos>>({});
   const [tisch, setTisch] = useState("");
   const [gast, setGast] = useState("");
@@ -48,7 +51,13 @@ export function KellnerClient() {
   // Meine Bestellungen
   const [meine, setMeine] = useState<MeineBestellung[]>([]);
   const [erledigtHeute, setErledigtHeute] = useState(0);
+  const [darfZahlen, setDarfZahlen] = useState(true);
   const [fehler, setFehler] = useState<string | null>(null);
+
+  // Bezahl-Modal
+  const [zahlFuer, setZahlFuer] = useState<MeineBestellung | null>(null);
+  const [zahlLaedt, setZahlLaedt] = useState(false);
+  const [zahlFehler, setZahlFehler] = useState<string | null>(null);
 
   useEffect(() => {
     jsonFetch<{ kategorien: Kat[]; produkte: Prod[] }>("/api/kellner/produkte")
@@ -61,11 +70,12 @@ export function KellnerClient() {
 
   const ladeMeine = useCallback(async () => {
     try {
-      const d = await jsonFetch<{ bestellungen: MeineBestellung[]; erledigtHeute: number }>(
+      const d = await jsonFetch<{ bestellungen: MeineBestellung[]; erledigtHeute: number; darfZahlen: boolean }>(
         "/api/kellner/bestellungen",
       );
       setMeine(d.bestellungen);
       setErledigtHeute(d.erledigtHeute);
+      setDarfZahlen(d.darfZahlen);
     } catch (e) {
       setFehler((e as Error).message);
     }
@@ -75,10 +85,14 @@ export function KellnerClient() {
   }, [ladeMeine]);
   useLive(ladeMeine);
 
-  const gefiltert = useMemo(
-    () => produkte.filter((p) => !katFilter || p.kategorieId === katFilter),
-    [produkte, katFilter],
-  );
+  const gefiltert = useMemo(() => {
+    const q = suche.trim().toLowerCase();
+    return produkte.filter((p) => {
+      if (katFilter && p.kategorieId !== katFilter) return false;
+      if (q && !p.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [produkte, katFilter, suche]);
   const positionen = Object.values(korb);
   const summe = positionen.reduce((s, p) => s + p.preisCent * p.menge, 0);
   const anzahl = positionen.reduce((s, p) => s + p.menge, 0);
@@ -142,17 +156,22 @@ export function KellnerClient() {
       await dialog.alert({ titel: "Fehler", text: (e as Error).message });
     }
   }
-  async function kassieren(b: MeineBestellung) {
-    const eingabe = await dialog.prompt({
-      titel: `Zahlung Nr. ${b.nummer}`,
-      text: `Gesamt ${formatCent(b.summeCent)}. Erhaltenen Betrag (€) eingeben (leer = passend):`,
-      platzhalter: "z. B. 50,00",
-      bestaetigenText: "Bezahlt",
-    });
-    if (eingabe === null) return;
-    const gegebenCent =
-      eingabe.trim() === "" ? null : Math.round(Number(eingabe.replace(",", ".")) * 100);
-    aktion(b.id, "zahlung", { gegebenCent: Number.isFinite(gegebenCent as number) ? gegebenCent : null });
+  async function bezahlen(gegebenCent: number | null) {
+    if (!zahlFuer || zahlLaedt) return;
+    setZahlLaedt(true);
+    setZahlFehler(null);
+    try {
+      await jsonFetch(`/api/bestellungen/${zahlFuer.id}/zahlung`, {
+        method: "POST",
+        body: JSON.stringify({ gegebenCent }),
+      });
+      setZahlFuer(null);
+      ladeMeine();
+    } catch (e) {
+      setZahlFehler((e as Error).message);
+    } finally {
+      setZahlLaedt(false);
+    }
   }
   async function fertigstellen(b: MeineBestellung) {
     const offene = b.bereiche.filter((a) => a.status !== "READY" && a.status !== "COLLECTED");
@@ -169,7 +188,7 @@ export function KellnerClient() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <RollenHeader titel="Kellner">
+      <RollenHeader titel="Verkauf">
         <div className="flex gap-1">
           <button className={`pill-tab ${tab === "neu" ? "on" : ""}`} onClick={() => setTab("neu")}>
             Neue Bestellung
@@ -178,6 +197,7 @@ export function KellnerClient() {
             Meine ({meine.length})
           </button>
         </div>
+        <InstallButton />
       </RollenHeader>
 
       {fehler && <p className="text-red-300 text-sm px-3 pt-2">{fehler}</p>}
@@ -185,15 +205,24 @@ export function KellnerClient() {
       {tab === "neu" ? (
         <div className="flex-1 flex min-h-0">
           <main className="flex-1 min-w-0 flex flex-col">
-            <div className="shrink-0 p-3 border-b border-neutral-800 flex gap-2 overflow-x-auto">
-              <button className={`chip-cat ${!katFilter ? "on" : ""}`} onClick={() => setKatFilter(null)}>
-                Alle
-              </button>
-              {kategorien.map((k) => (
-                <button key={k.id} className={`chip-cat ${katFilter === k.id ? "on" : ""}`} onClick={() => setKatFilter(k.id)}>
-                  {k.icon} {k.name}
+            <div className="shrink-0 p-3 border-b border-neutral-800 space-y-2">
+              <input
+                type="search"
+                className="input"
+                placeholder="Produkt suchen …"
+                value={suche}
+                onChange={(e) => setSuche(e.target.value)}
+              />
+              <div className="flex gap-2 overflow-x-auto">
+                <button className={`chip-cat ${!katFilter ? "on" : ""}`} onClick={() => setKatFilter(null)}>
+                  Alle
                 </button>
-              ))}
+                {kategorien.map((k) => (
+                  <button key={k.id} className={`chip-cat ${katFilter === k.id ? "on" : ""}`} onClick={() => setKatFilter(k.id)}>
+                    {k.icon} {k.name}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-3">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
@@ -309,8 +338,14 @@ export function KellnerClient() {
                     {ausgeliefert ? " · ausgeliefert ✓" : ""}
                   </span>
                   <div className="ml-auto flex gap-2">
-                    {!bezahlt && (
-                      <button className="btn-ghost py-1.5 text-sm" onClick={() => kassieren(b)}>
+                    {!bezahlt && darfZahlen && (
+                      <button
+                        className="btn-ghost py-1.5 text-sm"
+                        onClick={() => {
+                          setZahlFehler(null);
+                          setZahlFuer(b);
+                        }}
+                      >
                         Kassieren
                       </button>
                     )}
@@ -325,6 +360,17 @@ export function KellnerClient() {
             );
           })}
         </div>
+      )}
+
+      {zahlFuer && (
+        <ZahlModal
+          nummer={zahlFuer.nummer}
+          summeCent={zahlFuer.summeCent}
+          laedt={zahlLaedt}
+          fehler={zahlFehler}
+          onAbbrechen={() => setZahlFuer(null)}
+          onBezahlen={bezahlen}
+        />
       )}
     </div>
   );

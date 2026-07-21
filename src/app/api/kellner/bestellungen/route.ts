@@ -157,9 +157,14 @@ export async function GET() {
       where: { kellnerId: nurEigene, bestellStatus: "COMPLETED", abgeschlossenAm: { gte: heute } },
     });
 
+    // Darf dieser Verkäufer selbst kassieren? (ADMIN/SUPERVISOR immer; KELLNER nur mit Recht.)
+    const benutzer = await prisma.benutzer.findUnique({ where: { id: session.sub }, select: { darfZahlen: true } });
+    const darfZahlen = ["ADMIN", "SUPERVISOR"].includes(session.rolle) || benutzer?.darfZahlen === true;
+
     return ok(
       {
         erledigtHeute,
+        darfZahlen,
         bestellungen: bestellungen.map((b) => ({
           id: b.id,
           nummer: b.nummer,
