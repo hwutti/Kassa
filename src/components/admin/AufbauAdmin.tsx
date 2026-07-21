@@ -53,6 +53,8 @@ export function AufbauAdmin() {
   const [druckerForm, setDruckerForm] = useState<DruckerForm | null>(null);
   const [speichern, setSpeichern] = useState(false);
   const [ansicht, setAnsicht] = useState<"plan" | "liste">("plan");
+  const [zugaengeOffen, setZugaengeOffen] = useState(false);
+  const [pins, setPins] = useState<Record<string, string>>({}); // in dieser Sitzung erzeugte Klartext-PINs
 
   const laden = useCallback(async () => {
     try {
@@ -229,6 +231,78 @@ export function AufbauAdmin() {
     }
   }
 
+  // Erzeugt eine neue 6-stellige PIN für eine Person (eindeutig; bei Kollision erneut).
+  async function pinErzeugen(id: string) {
+    setFehler(null);
+    for (let versuch = 0; versuch < 6; versuch++) {
+      const pin = String(Math.floor(100000 + Math.random() * 900000));
+      try {
+        await jsonFetch(`/api/admin/benutzer/${id}`, { method: "PATCH", body: JSON.stringify({ pin }) });
+        setPins((p) => ({ ...p, [id]: pin }));
+        laden();
+        return;
+      } catch (e) {
+        const m = (e as Error).message;
+        if (!/vergeben/i.test(m)) {
+          setFehler(m);
+          return;
+        }
+        // PIN bereits vergeben -> nächster Versuch
+      }
+    }
+    setFehler("Konnte keine freie PIN erzeugen. Bitte erneut versuchen.");
+  }
+
+  async function alleFehlendenPins() {
+    // Für alle aktiven Nicht-Admins ohne PIN eine erzeugen.
+    for (const b of benutzer) {
+      if (b.aktiv && b.rolle !== "ADMIN" && !b.hatPin && !pins[b.id]) {
+        // eslint-disable-next-line no-await-in-loop
+        await pinErzeugen(b.id);
+      }
+    }
+  }
+
+  function druckeZugaenge() {
+    const zeilen = benutzer
+      .filter((b) => b.aktiv)
+      .map((b) => {
+        const pin = pins[b.id] ? pins[b.id] : b.hatPin ? "(gesetzt)" : "—";
+        const rolle = ROLLEN_LABEL[b.rolle as Rolle] ?? b.rolle;
+        return `<tr><td>${b.anzeigename || b.benutzername}</td><td>${rolle}</td><td>${b.benutzername}</td><td class="pin">${pin}</td></tr>`;
+      })
+      .join("");
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Zugaenge-Kirchtag</title>
+<style>
+  @page{size:A4;margin:16mm;}
+  body{font-family:Arial,sans-serif;color:#000;margin:0;}
+  h1{font-size:18px;margin:0 0 4px;} .sub{color:#555;font-size:12px;margin-bottom:12px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #ccc;}
+  th{background:#f0f0f0;} td.pin{font-family:monospace;font-weight:bold;font-size:15px;}
+  tr{page-break-inside:avoid;}
+</style></head><body>
+  <h1>Zugänge – Anmeldung am Tablet</h1>
+  <div class="sub">PIN am Anmelde-Bildschirm eingeben. „(gesetzt)" = PIN vorhanden, aber aus Sicherheitsgründen nicht anzeigbar – bei Bedarf neu erzeugen.</div>
+  <table><thead><tr><th>Bezeichnung</th><th>Funktion</th><th>Login</th><th>PIN</th></tr></thead><tbody>${zeilen}</tbody></table>
+  <script>window.addEventListener("load",function(){setTimeout(function(){window.print()},150)});setTimeout(function(){window.print()},1000);</script>
+</body></html>`;
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      iframe.remove();
+      return;
+    }
+    if (iframe.contentWindow) iframe.contentWindow.onafterprint = () => setTimeout(() => iframe.remove(), 500);
+    doc.open();
+    doc.write(html);
+    doc.close();
+    setTimeout(() => iframe.remove(), 15000);
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
@@ -243,6 +317,9 @@ export function AufbauAdmin() {
             Liste
           </button>
         </div>
+        <button className="btn-ghost" onClick={() => setZugaengeOffen(true)}>
+          🔑 Zugänge
+        </button>
         <button className="btn-primary" onClick={() => neu()}>
           + Person
         </button>
@@ -371,6 +448,106 @@ export function AufbauAdmin() {
           }}
         />
       )}
+
+      {zugaengeOffen && (
+        <ZugaengeListe
+          benutzer={benutzer}
+          pins={pins}
+          fehler={fehler}
+          onPin={pinErzeugen}
+          onAllePins={alleFehlendenPins}
+          onDrucken={druckeZugaenge}
+          onSchliessen={() => {
+            setZugaengeOffen(false);
+            setFehler(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ZugaengeListe({
+  benutzer,
+  pins,
+  fehler,
+  onPin,
+  onAllePins,
+  onDrucken,
+  onSchliessen,
+}: {
+  benutzer: Benutzer[];
+  pins: Record<string, string>;
+  fehler: string | null;
+  onPin: (id: string) => void;
+  onAllePins: () => void;
+  onDrucken: () => void;
+  onSchliessen: () => void;
+}) {
+  const liste = benutzer.filter((b) => b.aktiv);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="card w-full max-w-2xl max-h-[92dvh] flex flex-col p-5">
+        <div className="flex items-center gap-2 mb-1">
+          <h2 className="text-lg font-semibold">🔑 Zugänge / Anmeldung</h2>
+          <span className="ml-auto text-xs text-neutral-500">{liste.length} aktive Personen</span>
+        </div>
+        <p className="text-sm text-neutral-400 mb-3">
+          Personal meldet sich am Tablet per <b>PIN</b> an. Bereits gesetzte PINs sind aus Sicherheitsgründen nicht
+          mehr lesbar – bei Bedarf neu erzeugen (dann hier einmalig sichtbar) und ausdrucken.
+        </p>
+
+        <div className="flex-1 overflow-y-auto -mx-1 px-1">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-neutral-400 border-b border-neutral-800">
+                <th className="py-1.5 pr-2">Bezeichnung</th>
+                <th className="py-1.5 pr-2">Funktion</th>
+                <th className="py-1.5 pr-2">Login</th>
+                <th className="py-1.5 pr-2">PIN</th>
+                <th className="py-1.5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {liste.map((b) => (
+                <tr key={b.id} className="border-b border-neutral-900">
+                  <td className="py-1.5 pr-2">{b.anzeigename || b.benutzername}</td>
+                  <td className="py-1.5 pr-2 text-neutral-400">{ROLLEN_LABEL[b.rolle as Rolle] ?? b.rolle}</td>
+                  <td className="py-1.5 pr-2 font-mono">@{b.benutzername}</td>
+                  <td className="py-1.5 pr-2 font-mono tabular-nums">
+                    {pins[b.id] ? (
+                      <span className="text-brand-50 font-bold text-base">{pins[b.id]}</span>
+                    ) : b.hatPin ? (
+                      <span className="text-neutral-500">••••••</span>
+                    ) : (
+                      <span className="text-neutral-600">—</span>
+                    )}
+                  </td>
+                  <td className="py-1.5 text-right">
+                    <button className="btn-ghost py-1 text-xs" onClick={() => onPin(b.id)}>
+                      {b.hatPin || pins[b.id] ? "PIN neu" : "PIN erzeugen"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {fehler && <p className="text-red-300 text-sm mt-2">{fehler}</p>}
+
+        <div className="flex gap-2 pt-3 flex-wrap">
+          <button className="btn-ghost" onClick={onAllePins}>
+            PINs für alle ohne PIN erzeugen
+          </button>
+          <button className="btn-ghost" onClick={onDrucken}>
+            📄 Als PDF / Drucken
+          </button>
+          <button className="btn-primary ml-auto" onClick={onSchliessen}>
+            Schließen
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
