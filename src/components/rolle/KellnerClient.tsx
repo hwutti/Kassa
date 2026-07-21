@@ -11,7 +11,7 @@ import { ZahlModal } from "@/components/rolle/ZahlModal";
 import { InstallButton } from "@/components/kasse/InstallButton";
 
 type Kat = { id: string; name: string; farbe: string | null; icon: string | null };
-type Prod = { id: string; name: string; preisCent: number; icon: string | null; barcode: string | null; kategorieId: string };
+type Prod = { id: string; name: string; preisCent: number; icon: string | null; bildUrl: string | null; barcode: string | null; kategorieId: string };
 type Pos = { produktId: string; name: string; preisCent: number; menge: number };
 type MeineBestellung = {
   id: string;
@@ -240,20 +240,28 @@ export function KellnerClient() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-3">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
                 {gefiltert.map((p) => (
                   <button
                     key={p.id}
                     onClick={() => plus(p)}
-                    className={`card p-3 text-left active:scale-[.98] transition ${korb[p.id] ? "ring-2 ring-brand-600 border-brand-600" : ""}`}
+                    className={`card p-0 overflow-hidden text-left active:scale-[.98] transition ${korb[p.id] ? "ring-2 ring-brand-600 border-brand-600" : ""}`}
                   >
-                    <div className="flex items-start gap-2">
-                      {p.icon && <span className="text-2xl leading-none">{p.icon}</span>}
-                      <span className="font-medium leading-tight">{p.name}</span>
+                    {/* Großes Produktbild (oder Icon), damit man auf einen Blick erkennt, was man tippt. */}
+                    <div className="relative aspect-[4/3] bg-neutral-800 flex items-center justify-center">
+                      {p.bildUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.bildUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-4xl leading-none">{p.icon || "🍽️"}</span>
+                      )}
+                      {korb[p.id] && (
+                        <span className="absolute top-1 right-1 badge bg-brand-600 text-white shadow">{korb[p.id].menge}×</span>
+                      )}
                     </div>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-brand-50 font-semibold tabular-nums">{formatCent(p.preisCent)}</span>
-                      {korb[p.id] && <span className="badge bg-brand-600 text-white">{korb[p.id].menge}×</span>}
+                    <div className="p-2">
+                      <div className="font-medium leading-tight line-clamp-2">{p.name}</div>
+                      <div className="mt-0.5 text-brand-50 font-semibold tabular-nums">{formatCent(p.preisCent)}</div>
                     </div>
                   </button>
                 ))}
