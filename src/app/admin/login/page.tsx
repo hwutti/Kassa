@@ -43,7 +43,14 @@ function LoginForm() {
           return;
         }
         const rolle: string = info?.benutzer?.rolle ?? "ADMIN";
-        const ziel = weiter && weiter.startsWith("/") ? weiter : startseiteFuer(rolle);
+        // Admin kommt immer in den Verwaltungsbereich; andere Rollen ggf. zur
+        // ursprünglich angeforderten Seite (weiter) bzw. ihrer Startseite.
+        const ziel =
+          rolle === "ADMIN"
+            ? "/admin"
+            : weiter && weiter.startsWith("/")
+              ? weiter
+              : startseiteFuer(rolle);
         router.replace(ziel);
         router.refresh();
       } catch {
