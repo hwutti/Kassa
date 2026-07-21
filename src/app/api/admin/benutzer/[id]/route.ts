@@ -42,9 +42,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     });
     if (!ziel) return fehler("Benutzer nicht gefunden.", 404);
 
-    // Aussperr-Schutz: den letzten aktiven Admin nicht deaktivieren oder herabstufen.
     const wirdInaktiv = daten.aktiv === false && ziel.aktiv;
     const verliertAdmin = daten.rolle !== undefined && daten.rolle !== "ADMIN" && ziel.rolle === "ADMIN";
+
+    // Selbst-Aussperr-Schutz: Der angemeldete Admin kann sich NICHT selbst
+    // herabstufen oder deaktivieren – auch dann nicht, wenn es weitere Admins gibt.
+    // (Das war die häufige Aussperr-Falle: eigene Rolle versehentlich geändert.)
+    if (session.sub === id && verliertAdmin) {
+      return fehler("Sie können Ihre eigene Administrator-Rolle nicht entfernen.", 409);
+    }
+    if (session.sub === id && wirdInaktiv) {
+      return fehler("Sie können sich nicht selbst deaktivieren.", 409);
+    }
+
+    // Aussperr-Schutz: den letzten aktiven Admin nicht deaktivieren oder herabstufen.
     if ((wirdInaktiv || verliertAdmin) && (await letzterAdminBetroffen(id))) {
       return fehler("Der letzte aktive Administrator kann nicht deaktiviert oder herabgestuft werden.", 409);
     }
