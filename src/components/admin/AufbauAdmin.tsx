@@ -421,7 +421,7 @@ function PlanAnsicht({
 }) {
   const layout = useMemo(() => {
     type Sitz = { key: string; label: string; title: string; farbe: string; aktiv: boolean; add?: boolean; onClick: () => void };
-    type Gruppe = { key: string; label: string; farbe: string; sitze: Sitz[] };
+    type Gruppe = { key: string; label: string; farbe: string; sitze: Sitz[]; onAdd?: () => void };
     const person = (b: Benutzer, farbe: string): Sitz => ({
       key: b.id,
       label: initialen(b.anzeigename || b.benutzername),
@@ -468,7 +468,8 @@ function PlanAnsicht({
             : g.key === "drucker"
               ? onNeuDrucker
               : () => onNeuPerson({ rolle: "BEREICH", arbeitsbereichIds: [g.key.slice(3)] });
-      g.sitze.push({ key: g.key + "_add", label: "+", title: "hinzufügen", farbe: g.farbe, aktiv: true, add: true, onClick: add });
+      g.onAdd = add;
+      g.sitze.push({ key: g.key + "_add", label: "+", title: `${g.label}: hinzufügen`, farbe: g.farbe, aktiv: true, add: true, onClick: add });
     }
 
     // Flache Sitzliste in Gruppen-Reihenfolge + Startindex je Gruppe.
@@ -567,8 +568,8 @@ function PlanAnsicht({
             s.add ? (
               <g key={s.key} style={{ cursor: "pointer" }} onClick={s.onClick}>
                 <title>{s.title}</title>
-                <circle cx={x} cy={y} r={13} fill="transparent" stroke="#6b7280" strokeWidth={1.3} strokeDasharray="3 3" />
-                <text x={x} y={y + 5} textAnchor="middle" fontSize={16} fill="#a3a3a3">+</text>
+                <circle cx={x} cy={y} r={13} fill="transparent" stroke={s.farbe} strokeWidth={1.6} strokeDasharray="3 3" />
+                <text x={x} y={y + 5} textAnchor="middle" fontSize={16} fill={s.farbe}>+</text>
               </g>
             ) : (
               <g key={s.key} style={{ cursor: "pointer", opacity: s.aktiv ? 1 : 0.4 }} onClick={s.onClick}>
@@ -585,16 +586,25 @@ function PlanAnsicht({
         </svg>
       </div>
 
-      {/* Legende (Farbe → Bereich, Anzahl Personen/Drucker) */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-400">
-        {gruppen.map((g) => (
-          <span key={g.key} className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: g.farbe }} />
-            {g.label} ({g.sitze.length - 1})
-          </span>
-        ))}
+      {/* Hinzufügen je Bereich – benannt und eindeutig (klarer als das „+" am Bogen). */}
+      <div>
+        <div className="text-xs text-neutral-500 mb-1.5">Hinzufügen – Bereich antippen:</div>
+        <div className="flex flex-wrap gap-2 text-sm">
+          {gruppen.map((g) => (
+            <button
+              key={g.key}
+              onClick={g.onAdd}
+              className="inline-flex items-center gap-1.5 rounded-full border border-neutral-700 px-3 py-1.5 hover:border-brand-600 hover:text-white transition"
+              title={`${g.label}: hinzufügen`}
+            >
+              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: g.farbe }} />
+              {g.label} <span className="text-neutral-500">({g.sitze.length - 1})</span>
+              <span className="text-brand-50 font-semibold text-base leading-none">＋</span>
+            </button>
+          ))}
+        </div>
       </div>
-      <p className="text-xs text-neutral-500">Auf einen Platz tippen zum Bearbeiten, auf „+" zum Hinzufügen.</p>
+      <p className="text-xs text-neutral-500">Tipp: Platz am Bogen antippen zum Bearbeiten. Zum Hinzufügen unten den Bereich wählen (oder das farbige „+" am Bogen).</p>
     </div>
   );
 }
