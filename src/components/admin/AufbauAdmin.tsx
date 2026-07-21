@@ -44,6 +44,7 @@ export function AufbauAdmin() {
   const [fehler, setFehler] = useState<string | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
   const [speichern, setSpeichern] = useState(false);
+  const [ansicht, setAnsicht] = useState<"plan" | "liste">("plan");
 
   const laden = useCallback(async () => {
     try {
@@ -70,7 +71,7 @@ export function AufbauAdmin() {
     [benutzer],
   );
 
-  function neu() {
+  function neu(prefill?: Partial<FormState>) {
     setForm({
       benutzername: "",
       anzeigename: "",
@@ -80,6 +81,7 @@ export function AufbauAdmin() {
       darfStornieren: false,
       aktiv: true,
       arbeitsbereichIds: [],
+      ...prefill,
     });
   }
   function bearbeiten(b: Benutzer) {
@@ -154,11 +156,18 @@ export function AufbauAdmin() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <p className="text-sm text-neutral-400 flex-1 min-w-[16rem]">
-          So ist euer Fest aufgebaut: Wer verkauft, wer bereitet zu, wer kassiert. Auf eine Person tippen, um Login,
-          Bezeichnung, Funktion und Bereich zu ändern.
+        <p className="text-sm text-neutral-400 flex-1 min-w-[14rem]">
+          So ist euer Fest aufgebaut. Auf einen Platz tippen, um Login, Bezeichnung, Funktion und Bereich zu ändern.
         </p>
-        <button className="btn-primary" onClick={neu}>
+        <div className="flex gap-1">
+          <button className={`pill-tab ${ansicht === "plan" ? "on" : ""}`} onClick={() => setAnsicht("plan")}>
+            Plan
+          </button>
+          <button className={`pill-tab ${ansicht === "liste" ? "on" : ""}`} onClick={() => setAnsicht("liste")}>
+            Liste
+          </button>
+        </div>
+        <button className="btn-primary" onClick={() => neu()}>
           + Person
         </button>
       </div>
@@ -174,6 +183,12 @@ export function AufbauAdmin() {
 
       {fehler && <p className="text-red-300 text-sm">{fehler}</p>}
 
+      {ansicht === "plan" && (
+        <PlanAnsicht benutzer={benutzer} bereiche={bereiche} onPerson={bearbeiten} onNeu={neu} />
+      )}
+
+      {ansicht === "liste" && (
+      <>
       {/* Zone: Verkauf */}
       <Zone titel="Verkauf (Kellner)" icon="🧑‍🍳" hinweis="nehmen Bestellungen auf">
         {kellner.map((b) => (
@@ -238,6 +253,8 @@ export function AufbauAdmin() {
           ))}
         </Zone>
       </div>
+      </>
+      )}
 
       {form && (
         <PersonEditor
@@ -272,6 +289,111 @@ function Zone({ titel, icon, hinweis, children }: { titel: string; icon: string;
 
 function LeerHinweis({ text }: { text: string }) {
   return <p className="text-sm text-neutral-500 italic">{text}</p>;
+}
+
+type SitzFarbe = "kellner" | "bereich" | "kassa" | "leitung";
+const SITZ_STIL: Record<SitzFarbe, string> = {
+  kellner: "bg-brand-600/20 border-brand-600/50 text-brand-50",
+  bereich: "bg-blue-500/15 border-blue-500/50 text-blue-100",
+  kassa: "bg-amber-500/15 border-amber-500/50 text-amber-100",
+  leitung: "bg-neutral-700/40 border-neutral-600 text-neutral-200",
+};
+
+/** Grafische „Sitzplan"-Ansicht (Kino-Stil): Reihen mit Plätzen je Rolle/Bereich. */
+function PlanAnsicht({
+  benutzer,
+  bereiche,
+  onPerson,
+  onNeu,
+}: {
+  benutzer: Benutzer[];
+  bereiche: Bereich[];
+  onPerson: (b: Benutzer) => void;
+  onNeu: (prefill?: Partial<FormState>) => void;
+}) {
+  const kellner = benutzer.filter((b) => b.rolle === "KELLNER");
+  const kassa = benutzer.filter((b) => b.rolle === "KASSA");
+  const leitung = benutzer.filter((b) => b.rolle === "ADMIN" || b.rolle === "SUPERVISOR");
+
+  return (
+    <div className="space-y-3">
+      {/* „Bühne" – der Gast, dem alles zufließt */}
+      <div className="mx-auto max-w-sm text-center rounded-xl border border-neutral-700 bg-neutral-800/50 py-1.5 text-xs tracking-wide text-neutral-400">
+        AUSGABE · GAST
+      </div>
+
+      <PlanReihe titel="Verkauf (Kellner)">
+        {kellner.map((b, i) => (
+          <Seat key={b.id} b={b} farbe="kellner" nummer={i + 1} onClick={() => onPerson(b)} />
+        ))}
+        <AddSeat onClick={() => onNeu({ rolle: "KELLNER" })} />
+      </PlanReihe>
+
+      {bereiche.map((ab) => {
+        const leute = benutzer.filter((b) => b.rolle === "BEREICH" && b.arbeitsbereichIds.includes(ab.id));
+        return (
+          <PlanReihe key={ab.id} titel={`${ab.icon || "🏭"} ${ab.name}`} gedimmt={!ab.aktiv}>
+            {leute.map((b, i) => (
+              <Seat key={b.id} b={b} farbe="bereich" nummer={i + 1} onClick={() => onPerson(b)} />
+            ))}
+            <AddSeat onClick={() => onNeu({ rolle: "BEREICH", arbeitsbereichIds: [ab.id] })} />
+          </PlanReihe>
+        );
+      })}
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <PlanReihe titel="💶 Kassa">
+          {kassa.map((b, i) => (
+            <Seat key={b.id} b={b} farbe="kassa" nummer={i + 1} onClick={() => onPerson(b)} />
+          ))}
+          <AddSeat onClick={() => onNeu({ rolle: "KASSA", darfZahlen: true })} />
+        </PlanReihe>
+        <PlanReihe titel="🛠️ Leitung">
+          {leitung.map((b, i) => (
+            <Seat key={b.id} b={b} farbe="leitung" nummer={i + 1} onClick={() => onPerson(b)} />
+          ))}
+        </PlanReihe>
+      </div>
+    </div>
+  );
+}
+
+function PlanReihe({ titel, gedimmt, children }: { titel: string; gedimmt?: boolean; children: React.ReactNode }) {
+  return (
+    <div className={`card p-3 ${gedimmt ? "opacity-60" : ""}`}>
+      <div className="text-sm font-medium mb-2">{titel}</div>
+      <div className="flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+
+function Seat({ b, farbe, nummer, onClick }: { b: Benutzer; farbe: SitzFarbe; nummer: number; onClick: () => void }) {
+  const kuerzel = (b.anzeigename || b.benutzername).slice(0, 2).toUpperCase();
+  return (
+    <button
+      onClick={onClick}
+      title={`${b.anzeigename || b.benutzername} (@${b.benutzername})`}
+      className={`w-[74px] shrink-0 rounded-lg border p-1.5 text-center transition hover:brightness-125 ${SITZ_STIL[farbe]} ${b.aktiv ? "" : "opacity-50"}`}
+    >
+      <div className="mx-auto h-8 w-8 rounded-md flex items-center justify-center text-sm font-semibold bg-black/25">
+        {kuerzel}
+      </div>
+      <div className="mt-1 text-[11px] leading-tight truncate">{b.anzeigename || `Platz ${nummer}`}</div>
+    </button>
+  );
+}
+
+function AddSeat({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title="Person hinzufügen"
+      className="w-[74px] h-[68px] shrink-0 rounded-lg border border-dashed border-neutral-600 text-neutral-500 flex flex-col items-center justify-center transition hover:border-brand-600 hover:text-brand-50"
+    >
+      <span className="text-xl leading-none">+</span>
+      <span className="text-[11px]">frei</span>
+    </button>
+  );
 }
 
 function PersonKarte({ b, onClick, kompakt }: { b: Benutzer; onClick: () => void; kompakt?: boolean }) {
