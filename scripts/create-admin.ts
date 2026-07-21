@@ -15,10 +15,12 @@ async function main() {
   }
   await prisma.benutzer.upsert({
     where: { benutzername: name },
-    update: { passwortHash: hashPasswort(pass), aktiv: true },
+    // Beim Zurücksetzen IMMER wieder zum aktiven Administrator machen
+    // (behebt versehentlich geänderte Rolle / deaktivierten Zugang → nicht aussperrbar).
+    update: { passwortHash: hashPasswort(pass), aktiv: true, rolle: "ADMIN" },
     create: { benutzername: name, passwortHash: hashPasswort(pass), rolle: "ADMIN" },
   });
-  console.log(`Administrator "${name}" angelegt/aktualisiert.`);
+  console.log(`Administrator "${name}" angelegt/aktualisiert (Rolle ADMIN, aktiv).`);
 }
 
 main()
