@@ -771,17 +771,28 @@ function PersonEditor({
           <span className="text-sm text-neutral-400">
             PIN (6 Ziffern, für Schnell-Login){form.pinGesetzt ? " – gesetzt" : ""}
           </span>
-          <input
-            type="text"
-            inputMode="numeric"
-            maxLength={6}
-            className="input mt-1 tracking-widest"
-            value={form.pin}
-            onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, "").slice(0, 6), pinEntfernen: false })}
-            placeholder={form.pinGesetzt ? "•••••• (leer = unverändert)" : "z. B. 246810"}
-            autoComplete="off"
-            disabled={form.pinEntfernen}
-          />
+          <div className="mt-1 flex gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              className="input tracking-widest flex-1"
+              value={form.pin}
+              onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, "").slice(0, 6), pinEntfernen: false })}
+              placeholder={form.pinGesetzt ? "•••••• (leer = unverändert)" : "z. B. 246810"}
+              autoComplete="off"
+              disabled={form.pinEntfernen}
+            />
+            <button
+              type="button"
+              className="btn-ghost shrink-0"
+              disabled={form.pinEntfernen}
+              onClick={() => setForm({ ...form, pin: String(Math.floor(100000 + Math.random() * 900000)), pinEntfernen: false })}
+              title="Zufällige PIN erzeugen"
+            >
+              🎲 Generieren
+            </button>
+          </div>
           {form.pinGesetzt && (
             <label className="mt-1 flex items-center gap-2 text-xs text-neutral-400">
               <input
