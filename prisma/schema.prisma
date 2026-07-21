@@ -242,6 +242,24 @@ model Arbeitsbereich {
   produkte    ProduktArbeitsbereich[]
   mitarbeiter BenutzerArbeitsbereich[]
   tickets     Bereichsticket[]
+  drucker     Drucker[]
+}
+
+/// Drucker (Bon-/Küchendrucker). Frei konfigurierbar, optional einem Arbeitsbereich zugeordnet.
+model Drucker {
+  id          String   @id @default(cuid())
+  name        String
+  typ         String   @default("SYSTEM") // SYSTEM (Systemdrucker/Browser) | NETZWERK (ESC/POS über IP)
+  ip          String?  // nur bei Typ NETZWERK
+  aktiv       Boolean  @default(true)
+  sortierung  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  arbeitsbereichId String?
+  arbeitsbereich   Arbeitsbereich? @relation(fields: [arbeitsbereichId], references: [id], onDelete: SetNull)
+
+  @@index([arbeitsbereichId])
 }
 
 /// Zuordnung Produkt <-> Arbeitsbereich (n:m). Konfigurierbar, nicht im Code fixiert.

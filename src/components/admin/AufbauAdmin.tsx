@@ -16,6 +16,8 @@ type Benutzer = {
   arbeitsbereichIds: string[];
 };
 type Bereich = { id: string; name: string; icon: string | null; aktiv: boolean };
+type Drucker = { id: string; name: string; typ: "SYSTEM" | "NETZWERK"; ip: string | null; aktiv: boolean; arbeitsbereichId: string | null };
+type DruckerForm = { id?: string; name: string; typ: "SYSTEM" | "NETZWERK"; ip: string; aktiv: boolean; arbeitsbereichId: string };
 
 type FormState = {
   id?: string;
@@ -41,19 +43,23 @@ export function AufbauAdmin() {
   const dialog = useDialog();
   const [benutzer, setBenutzer] = useState<Benutzer[]>([]);
   const [bereiche, setBereiche] = useState<Bereich[]>([]);
+  const [drucker, setDrucker] = useState<Drucker[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
+  const [druckerForm, setDruckerForm] = useState<DruckerForm | null>(null);
   const [speichern, setSpeichern] = useState(false);
   const [ansicht, setAnsicht] = useState<"plan" | "liste">("plan");
 
   const laden = useCallback(async () => {
     try {
-      const [b, a] = await Promise.all([
+      const [b, a, d] = await Promise.all([
         jsonFetch<Benutzer[]>("/api/admin/benutzer"),
         jsonFetch<Bereich[]>("/api/admin/arbeitsbereiche"),
+        jsonFetch<Drucker[]>("/api/admin/drucker"),
       ]);
       setBenutzer(b);
       setBereiche(a);
+      setDrucker(d);
       setFehler(null);
     } catch (e) {
       setFehler((e as Error).message);
@@ -153,6 +159,54 @@ export function AufbauAdmin() {
     }
   }
 
+  function neuDrucker() {
+    setDruckerForm({ name: "", typ: "SYSTEM", ip: "", aktiv: true, arbeitsbereichId: "" });
+  }
+  function bearbeitenDrucker(d: Drucker) {
+    setDruckerForm({ id: d.id, name: d.name, typ: d.typ, ip: d.ip ?? "", aktiv: d.aktiv, arbeitsbereichId: d.arbeitsbereichId ?? "" });
+  }
+  async function speichernDrucker() {
+    if (!druckerForm) return;
+    if (!druckerForm.name.trim()) {
+      setFehler("Name des Druckers ist erforderlich.");
+      return;
+    }
+    setSpeichern(true);
+    setFehler(null);
+    const body = {
+      name: druckerForm.name.trim(),
+      typ: druckerForm.typ,
+      ip: druckerForm.ip.trim() || null,
+      aktiv: druckerForm.aktiv,
+      arbeitsbereichId: druckerForm.arbeitsbereichId || null,
+    };
+    try {
+      if (druckerForm.id) {
+        await jsonFetch(`/api/admin/drucker/${druckerForm.id}`, { method: "PATCH", body: JSON.stringify(body) });
+      } else {
+        await jsonFetch("/api/admin/drucker", { method: "POST", body: JSON.stringify(body) });
+      }
+      setDruckerForm(null);
+      laden();
+    } catch (e) {
+      setFehler((e as Error).message);
+    } finally {
+      setSpeichern(false);
+    }
+  }
+  async function loeschenDrucker() {
+    if (!druckerForm?.id) return;
+    const ok = await dialog.confirm({ titel: "Drucker löschen", text: `Drucker „${druckerForm.name}" löschen?`, bestaetigenText: "Löschen", gefahr: true });
+    if (!ok) return;
+    try {
+      await jsonFetch(`/api/admin/drucker/${druckerForm.id}`, { method: "DELETE" });
+      setDruckerForm(null);
+      laden();
+    } catch (e) {
+      setFehler((e as Error).message);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
@@ -184,7 +238,15 @@ export function AufbauAdmin() {
       {fehler && <p className="text-red-300 text-sm">{fehler}</p>}
 
       {ansicht === "plan" && (
-        <PlanAnsicht benutzer={benutzer} bereiche={bereiche} onPerson={bearbeiten} onNeu={neu} />
+        <PlanAnsicht
+          benutzer={benutzer}
+          bereiche={bereiche}
+          drucker={drucker}
+          onPerson={bearbeiten}
+          onNeuPerson={neu}
+          onDrucker={bearbeitenDrucker}
+          onNeuDrucker={neuDrucker}
+        />
       )}
 
       {ansicht === "liste" && (
@@ -270,6 +332,21 @@ export function AufbauAdmin() {
           }}
         />
       )}
+
+      {druckerForm && (
+        <DruckerEditor
+          form={druckerForm}
+          setForm={setDruckerForm}
+          bereiche={bereiche}
+          speichern={speichern}
+          onSpeichern={speichernDrucker}
+          onLoeschen={druckerForm.id ? loeschenDrucker : undefined}
+          onAbbrechen={() => {
+            setDruckerForm(null);
+            setFehler(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -291,108 +368,223 @@ function LeerHinweis({ text }: { text: string }) {
   return <p className="text-sm text-neutral-500 italic">{text}</p>;
 }
 
-type SitzFarbe = "kellner" | "bereich" | "kassa" | "leitung";
-const SITZ_STIL: Record<SitzFarbe, string> = {
-  kellner: "bg-brand-600/20 border-brand-600/50 text-brand-50",
-  bereich: "bg-blue-500/15 border-blue-500/50 text-blue-100",
-  kassa: "bg-amber-500/15 border-amber-500/50 text-amber-100",
-  leitung: "bg-neutral-700/40 border-neutral-600 text-neutral-200",
-};
+const AREA_FARBEN = ["#378ADD", "#7F77DD", "#D85A30", "#1D9E75", "#EF9F27", "#D4537E", "#5DCAA5", "#BA7517"];
+function initialen(s: string): string {
+  return (s || "?").slice(0, 2).toUpperCase();
+}
 
-/** Grafische „Sitzplan"-Ansicht (Kino-Stil): Reihen mit Plätzen je Rolle/Bereich. */
+/**
+ * Dynamische Bogen-/Halbkreis-Ansicht: alle Rollen, Bereiche und Drucker als
+ * Plätze auf einem Halbkreis. Passt sich automatisch an jede Anzahl an
+ * (2 oder 15 Kellner, 1 oder 15 Drucker …).
+ */
 function PlanAnsicht({
   benutzer,
   bereiche,
+  drucker,
   onPerson,
-  onNeu,
+  onNeuPerson,
+  onDrucker,
+  onNeuDrucker,
 }: {
   benutzer: Benutzer[];
   bereiche: Bereich[];
+  drucker: Drucker[];
   onPerson: (b: Benutzer) => void;
-  onNeu: (prefill?: Partial<FormState>) => void;
+  onNeuPerson: (prefill?: Partial<FormState>) => void;
+  onDrucker: (d: Drucker) => void;
+  onNeuDrucker: () => void;
 }) {
-  const kellner = benutzer.filter((b) => b.rolle === "KELLNER");
-  const kassa = benutzer.filter((b) => b.rolle === "KASSA");
-  const leitung = benutzer.filter((b) => b.rolle === "ADMIN" || b.rolle === "SUPERVISOR");
+  const layout = useMemo(() => {
+    type Sitz = { key: string; label: string; title: string; farbe: string; aktiv: boolean; add?: boolean; onClick: () => void };
+    type Gruppe = { key: string; label: string; farbe: string; sitze: Sitz[] };
+    const person = (b: Benutzer, farbe: string): Sitz => ({
+      key: b.id,
+      label: initialen(b.anzeigename || b.benutzername),
+      title: `${b.anzeigename || b.benutzername} (@${b.benutzername})`,
+      farbe,
+      aktiv: b.aktiv,
+      onClick: () => onPerson(b),
+    });
+    const gruppen: Gruppe[] = [];
+    gruppen.push({
+      key: "verkauf", label: "Verkauf", farbe: "#639922",
+      sitze: benutzer.filter((b) => b.rolle === "KELLNER").map((b) => person(b, "#639922")),
+    });
+    bereiche.forEach((ab, i) => {
+      const farbe = AREA_FARBEN[i % AREA_FARBEN.length];
+      gruppen.push({
+        key: "ab_" + ab.id, label: ab.name, farbe,
+        sitze: benutzer.filter((b) => b.rolle === "BEREICH" && b.arbeitsbereichIds.includes(ab.id)).map((b) => person(b, farbe)),
+      });
+    });
+    gruppen.push({
+      key: "kassa", label: "Kassa", farbe: "#BA7517",
+      sitze: benutzer.filter((b) => b.rolle === "KASSA").map((b) => person(b, "#BA7517")),
+    });
+    gruppen.push({
+      key: "drucker", label: "Drucker", farbe: "#6b7280",
+      sitze: drucker.map((d) => ({
+        key: d.id, label: initialen(d.name), title: d.name + (d.ip ? ` (${d.ip})` : ""), farbe: "#6b7280", aktiv: d.aktiv, onClick: () => onDrucker(d),
+      })),
+    });
+    gruppen.push({
+      key: "leitung", label: "Leitung", farbe: "#888780",
+      sitze: benutzer.filter((b) => b.rolle === "ADMIN" || b.rolle === "SUPERVISOR").map((b) => person(b, "#888780")),
+    });
+
+    // Je Gruppe einen „+"-Platz zum Hinzufügen anhängen.
+    for (const g of gruppen) {
+      const add = g.key === "verkauf"
+        ? () => onNeuPerson({ rolle: "KELLNER" })
+        : g.key === "kassa"
+          ? () => onNeuPerson({ rolle: "KASSA", darfZahlen: true })
+          : g.key === "leitung"
+            ? () => onNeuPerson({ rolle: "ADMIN" })
+            : g.key === "drucker"
+              ? onNeuDrucker
+              : () => onNeuPerson({ rolle: "BEREICH", arbeitsbereichIds: [g.key.slice(3)] });
+      g.sitze.push({ key: g.key + "_add", label: "+", title: "hinzufügen", farbe: g.farbe, aktiv: true, add: true, onClick: add });
+    }
+
+    const total = gruppen.reduce((s, g) => s + g.sitze.length, 0) || 1;
+    const R = Math.max(150, Math.min(360, Math.round(9.8 * total)));
+    const cx = R + 44, cy = R + 50, slot = 180 / total;
+    const rad = (deg: number) => (deg * Math.PI) / 180;
+
+    let k = 0;
+    const sitze: { x: number; y: number; s: Sitz }[] = [];
+    const trenner: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    const labels: { x: number; y: number; text: string }[] = [];
+    for (const g of gruppen) {
+      const startK = k;
+      const thB = rad(180 - startK * slot);
+      trenner.push({ x1: cx + 62 * Math.cos(thB), y1: cy - 62 * Math.sin(thB), x2: cx + (R + 16) * Math.cos(thB), y2: cy - (R + 16) * Math.sin(thB) });
+      for (const s of g.sitze) {
+        const th = rad(180 - (k + 0.5) * slot);
+        sitze.push({ x: cx + R * Math.cos(th), y: cy - R * Math.sin(th), s });
+        k++;
+      }
+      const thM = rad(180 - (startK + g.sitze.length / 2) * slot);
+      labels.push({ x: cx + (R + 30) * Math.cos(thM), y: cy - (R + 30) * Math.sin(thM), text: g.label });
+    }
+    return { gruppen, sitze, trenner, labels, cx, cy, vbW: 2 * R + 88, vbH: R + 82 };
+  }, [benutzer, bereiche, drucker, onPerson, onNeuPerson, onDrucker, onNeuDrucker]);
+
+  const { sitze, trenner, labels, cx, cy, vbW, vbH, gruppen } = layout;
 
   return (
     <div className="space-y-3">
-      {/* „Bühne" – der Gast, dem alles zufließt */}
-      <div className="mx-auto max-w-sm text-center rounded-xl border border-neutral-700 bg-neutral-800/50 py-1.5 text-xs tracking-wide text-neutral-400">
-        AUSGABE · GAST
+      <div className="overflow-x-auto">
+        <svg viewBox={`0 0 ${vbW} ${vbH}`} className="w-full h-auto" style={{ minWidth: 320 }} role="img" aria-label="Aufbau als Halbkreis">
+          {trenner.map((t, i) => (
+            <line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke="#3f3f46" strokeWidth={1} strokeDasharray="2 5" />
+          ))}
+          {labels.map((l, i) => (
+            <text key={i} x={l.x} y={l.y} textAnchor="middle" fontSize={11} fill="#a3a3a3">{l.text}</text>
+          ))}
+          {sitze.map(({ x, y, s }) =>
+            s.add ? (
+              <g key={s.key} style={{ cursor: "pointer" }} onClick={s.onClick}>
+                <title>{s.title}</title>
+                <circle cx={x} cy={y} r={13} fill="transparent" stroke="#6b7280" strokeWidth={1.3} strokeDasharray="3 3" />
+                <text x={x} y={y + 5} textAnchor="middle" fontSize={16} fill="#a3a3a3">+</text>
+              </g>
+            ) : (
+              <g key={s.key} style={{ cursor: "pointer", opacity: s.aktiv ? 1 : 0.4 }} onClick={s.onClick}>
+                <title>{s.title}</title>
+                <circle cx={x} cy={y} r={14} fill={s.farbe} />
+                <text x={x} y={y + 4} textAnchor="middle" fontSize={10} fontWeight={600} fill="#ffffff">{s.label}</text>
+              </g>
+            ),
+          )}
+          <g>
+            <rect x={cx - 62} y={cy - 15} width={124} height={30} rx={8} fill="#1f1f23" stroke="#52525b" />
+            <text x={cx} y={cy + 4} textAnchor="middle" fontSize={12} fill="#a3a3a3">Ausgabe · Gast</text>
+          </g>
+        </svg>
       </div>
 
-      <PlanReihe titel="Verkauf (Kellner)">
-        {kellner.map((b, i) => (
-          <Seat key={b.id} b={b} farbe="kellner" nummer={i + 1} onClick={() => onPerson(b)} />
+      {/* Legende (Farbe → Bereich, Anzahl Personen/Drucker) */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-400">
+        {gruppen.map((g) => (
+          <span key={g.key} className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: g.farbe }} />
+            {g.label} ({g.sitze.length - 1})
+          </span>
         ))}
-        <AddSeat onClick={() => onNeu({ rolle: "KELLNER" })} />
-      </PlanReihe>
+      </div>
+      <p className="text-xs text-neutral-500">Auf einen Platz tippen zum Bearbeiten, auf „+" zum Hinzufügen.</p>
+    </div>
+  );
+}
 
-      {bereiche.map((ab) => {
-        const leute = benutzer.filter((b) => b.rolle === "BEREICH" && b.arbeitsbereichIds.includes(ab.id));
-        return (
-          <PlanReihe key={ab.id} titel={`${ab.icon || "🏭"} ${ab.name}`} gedimmt={!ab.aktiv}>
-            {leute.map((b, i) => (
-              <Seat key={b.id} b={b} farbe="bereich" nummer={i + 1} onClick={() => onPerson(b)} />
+function DruckerEditor({
+  form,
+  setForm,
+  bereiche,
+  speichern,
+  onSpeichern,
+  onLoeschen,
+  onAbbrechen,
+}: {
+  form: DruckerForm;
+  setForm: (f: DruckerForm) => void;
+  bereiche: Bereich[];
+  speichern: boolean;
+  onSpeichern: () => void;
+  onLoeschen?: () => void;
+  onAbbrechen: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="card w-full max-w-md p-5 space-y-3">
+        <h2 className="text-lg font-semibold">{form.id ? "Drucker bearbeiten" : "Neuer Drucker"}</h2>
+        <label className="block">
+          <span className="text-sm text-neutral-400">Name</span>
+          <input className="input mt-1" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="z. B. Bon Bierzelt" />
+        </label>
+        <label className="block">
+          <span className="text-sm text-neutral-400">Typ</span>
+          <select className="input mt-1" value={form.typ} onChange={(e) => setForm({ ...form, typ: e.target.value as "SYSTEM" | "NETZWERK" })}>
+            <option value="SYSTEM">Systemdrucker (Tablet/Browser)</option>
+            <option value="NETZWERK">Netzwerk (ESC/POS über IP)</option>
+          </select>
+        </label>
+        {form.typ === "NETZWERK" && (
+          <label className="block">
+            <span className="text-sm text-neutral-400">IP-Adresse</span>
+            <input className="input mt-1" value={form.ip} onChange={(e) => setForm({ ...form, ip: e.target.value })} placeholder="z. B. 192.168.0.50" inputMode="decimal" />
+          </label>
+        )}
+        <label className="block">
+          <span className="text-sm text-neutral-400">Arbeitsbereich (optional)</span>
+          <select className="input mt-1" value={form.arbeitsbereichId} onChange={(e) => setForm({ ...form, arbeitsbereichId: e.target.value })}>
+            <option value="">— keiner —</option>
+            {bereiche.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
             ))}
-            <AddSeat onClick={() => onNeu({ rolle: "BEREICH", arbeitsbereichIds: [ab.id] })} />
-          </PlanReihe>
-        );
-      })}
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <PlanReihe titel="💶 Kassa">
-          {kassa.map((b, i) => (
-            <Seat key={b.id} b={b} farbe="kassa" nummer={i + 1} onClick={() => onPerson(b)} />
-          ))}
-          <AddSeat onClick={() => onNeu({ rolle: "KASSA", darfZahlen: true })} />
-        </PlanReihe>
-        <PlanReihe titel="🛠️ Leitung">
-          {leitung.map((b, i) => (
-            <Seat key={b.id} b={b} farbe="leitung" nummer={i + 1} onClick={() => onPerson(b)} />
-          ))}
-        </PlanReihe>
+          </select>
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" className="accent-brand-600 h-4 w-4" checked={form.aktiv} onChange={(e) => setForm({ ...form, aktiv: e.target.checked })} />
+          <span className="text-sm">aktiv</span>
+        </label>
+        <div className="flex gap-2 pt-1">
+          {onLoeschen && (
+            <button className="btn-ghost text-red-300" onClick={onLoeschen} disabled={speichern}>
+              Löschen
+            </button>
+          )}
+          <button className="btn-ghost ml-auto" onClick={onAbbrechen} disabled={speichern}>
+            Abbrechen
+          </button>
+          <button className="btn-primary" onClick={onSpeichern} disabled={speichern}>
+            {speichern ? "Speichere …" : "Speichern"}
+          </button>
+        </div>
       </div>
     </div>
-  );
-}
-
-function PlanReihe({ titel, gedimmt, children }: { titel: string; gedimmt?: boolean; children: React.ReactNode }) {
-  return (
-    <div className={`card p-3 ${gedimmt ? "opacity-60" : ""}`}>
-      <div className="text-sm font-medium mb-2">{titel}</div>
-      <div className="flex flex-wrap gap-2">{children}</div>
-    </div>
-  );
-}
-
-function Seat({ b, farbe, nummer, onClick }: { b: Benutzer; farbe: SitzFarbe; nummer: number; onClick: () => void }) {
-  const kuerzel = (b.anzeigename || b.benutzername).slice(0, 2).toUpperCase();
-  return (
-    <button
-      onClick={onClick}
-      title={`${b.anzeigename || b.benutzername} (@${b.benutzername})`}
-      className={`w-[74px] shrink-0 rounded-lg border p-1.5 text-center transition hover:brightness-125 ${SITZ_STIL[farbe]} ${b.aktiv ? "" : "opacity-50"}`}
-    >
-      <div className="mx-auto h-8 w-8 rounded-md flex items-center justify-center text-sm font-semibold bg-black/25">
-        {kuerzel}
-      </div>
-      <div className="mt-1 text-[11px] leading-tight truncate">{b.anzeigename || `Platz ${nummer}`}</div>
-    </button>
-  );
-}
-
-function AddSeat({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      title="Person hinzufügen"
-      className="w-[74px] h-[68px] shrink-0 rounded-lg border border-dashed border-neutral-600 text-neutral-500 flex flex-col items-center justify-center transition hover:border-brand-600 hover:text-brand-50"
-    >
-      <span className="text-xl leading-none">+</span>
-      <span className="text-[11px]">frei</span>
-    </button>
   );
 }
 
