@@ -116,22 +116,26 @@ export function AufbauAdmin() {
 
   async function speichernForm() {
     if (!form) return;
-    if (!form.benutzername.trim()) {
-      setFehler("Benutzername (Login) ist erforderlich.");
+    if (!form.id && !form.benutzername.trim() && !form.anzeigename.trim()) {
+      setFehler("Bitte eine Bezeichnung oder einen Login angeben.");
       return;
     }
-    if (!form.id && form.passwort.length < 4) {
-      setFehler("Bitte ein Passwort (mind. 4 Zeichen) vergeben.");
+    if (form.passwort && form.passwort.length < 4) {
+      setFehler("Das Passwort muss mindestens 4 Zeichen haben.");
       return;
     }
     if (form.pin && !/^\d{4,6}$/.test(form.pin)) {
       setFehler("Die PIN muss aus 4–6 Ziffern bestehen.");
       return;
     }
+    // Neue Person braucht mindestens eine Anmeldeart (Passwort ODER PIN).
+    if (!form.id && !form.passwort && !form.pin) {
+      setFehler("Bitte ein Passwort oder eine PIN vergeben.");
+      return;
+    }
     setSpeichern(true);
     setFehler(null);
     const body: Record<string, unknown> = {
-      benutzername: form.benutzername.trim(),
       anzeigename: form.anzeigename.trim() || null,
       rolle: form.rolle,
       darfZahlen: form.darfZahlen,
@@ -139,6 +143,7 @@ export function AufbauAdmin() {
       aktiv: form.aktiv,
       arbeitsbereichIds: form.arbeitsbereichIds,
     };
+    if (form.benutzername.trim()) body.benutzername = form.benutzername.trim();
     if (form.passwort) body.passwort = form.passwort;
     // PIN: entfernen (leer) hat Vorrang; sonst nur bei Eingabe setzen.
     if (form.pinEntfernen) body.pin = "";
@@ -341,6 +346,7 @@ export function AufbauAdmin() {
           setForm={setForm}
           bereiche={bereiche}
           speichern={speichern}
+          fehler={fehler}
           onSpeichern={speichernForm}
           onLoeschen={form.id ? loeschen : undefined}
           onAbbrechen={() => {
@@ -356,6 +362,7 @@ export function AufbauAdmin() {
           setForm={setDruckerForm}
           bereiche={bereiche}
           speichern={speichern}
+          fehler={fehler}
           onSpeichern={speichernDrucker}
           onLoeschen={druckerForm.id ? loeschenDrucker : undefined}
           onAbbrechen={() => {
@@ -597,6 +604,7 @@ function DruckerEditor({
   setForm,
   bereiche,
   speichern,
+  fehler,
   onSpeichern,
   onLoeschen,
   onAbbrechen,
@@ -605,6 +613,7 @@ function DruckerEditor({
   setForm: (f: DruckerForm) => void;
   bereiche: Bereich[];
   speichern: boolean;
+  fehler: string | null;
   onSpeichern: () => void;
   onLoeschen?: () => void;
   onAbbrechen: () => void;
@@ -643,6 +652,12 @@ function DruckerEditor({
           <input type="checkbox" className="accent-brand-600 h-4 w-4" checked={form.aktiv} onChange={(e) => setForm({ ...form, aktiv: e.target.checked })} />
           <span className="text-sm">aktiv</span>
         </label>
+        {fehler && (
+          <p role="alert" className="text-sm text-red-300 bg-red-950/50 rounded-lg px-3 py-2">
+            {fehler}
+          </p>
+        )}
+
         <div className="flex gap-2 pt-1">
           {onLoeschen && (
             <button className="btn-ghost text-red-300" onClick={onLoeschen} disabled={speichern}>
@@ -691,6 +706,7 @@ function PersonEditor({
   setForm,
   bereiche,
   speichern,
+  fehler,
   onSpeichern,
   onLoeschen,
   onAbbrechen,
@@ -699,6 +715,7 @@ function PersonEditor({
   setForm: (f: FormState) => void;
   bereiche: Bereich[];
   speichern: boolean;
+  fehler: string | null;
   onSpeichern: () => void;
   onLoeschen?: () => void;
   onAbbrechen: () => void;
@@ -727,7 +744,7 @@ function PersonEditor({
         </label>
 
         <label className="block">
-          <span className="text-sm text-neutral-400">Login (Benutzername)</span>
+          <span className="text-sm text-neutral-400">Login (Benutzername) – optional, wird sonst automatisch erzeugt</span>
           <input
             className="input mt-1"
             value={form.benutzername}
@@ -735,6 +752,7 @@ function PersonEditor({
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
+            placeholder="leer lassen für PIN-Anmeldung"
           />
         </label>
 
@@ -862,6 +880,12 @@ function PersonEditor({
               )}
             </div>
           </div>
+        )}
+
+        {fehler && (
+          <p role="alert" className="text-sm text-red-300 bg-red-950/50 rounded-lg px-3 py-2">
+            {fehler}
+          </p>
         )}
 
         <div className="flex gap-2 pt-1">

@@ -249,8 +249,12 @@ export function ProdukteAdmin() {
           kategorien={kategorien}
           bereiche={bereiche}
           arbeitsbereiche={arbeitsbereiche}
+          fehler={fehler}
           onSpeichern={speichern}
-          onAbbrechen={() => setForm(null)}
+          onAbbrechen={() => {
+            setForm(null);
+            setFehler(null);
+          }}
         />
       )}
     </div>
@@ -263,6 +267,7 @@ function ProduktForm({
   kategorien,
   bereiche,
   arbeitsbereiche,
+  fehler,
   onSpeichern,
   onAbbrechen,
 }: {
@@ -271,6 +276,7 @@ function ProduktForm({
   kategorien: Kategorie[];
   bereiche: Bereich[];
   arbeitsbereiche: Bereich[];
+  fehler: string | null;
   onSpeichern: () => void;
   onAbbrechen: () => void;
 }) {
@@ -396,8 +402,23 @@ function ProduktForm({
               inputMode="decimal"
               placeholder="z. B. 2,50"
               value={form.preisText}
-              onChange={(e) => setForm({ ...form, preisText: e.target.value })}
+              onChange={(e) => {
+                // Nur Ziffern + ein Trennzeichen; Punkt als Komma übernehmen.
+                const roh = e.target.value.replace(/[^\d.,]/g, "").replace(/\./g, ",");
+                const teile = roh.split(",");
+                const bereinigt = teile.length > 1 ? teile[0] + "," + teile.slice(1).join("").slice(0, 2) : teile[0];
+                setForm({ ...form, preisText: bereinigt });
+              }}
+              onBlur={() => {
+                const cent = parseEuroToCent(form.preisText);
+                if (cent !== null) setForm({ ...form, preisText: (cent / 100).toFixed(2).replace(".", ",") });
+              }}
             />
+            {form.preisText.trim() !== "" && (
+              <span className="mt-1 block text-xs text-neutral-500">
+                = {parseEuroToCent(form.preisText) === null ? "ungültig" : formatCent(parseEuroToCent(form.preisText))}
+              </span>
+            )}
           </label>
           <label className="block">
             <span className="text-sm text-neutral-400">Kategorie</span>
@@ -479,6 +500,12 @@ function ProduktForm({
             <span>Produkt aktiv</span>
           </label>
         </div>
+
+        {fehler && (
+          <p role="alert" className="text-sm text-red-300 bg-red-950/50 rounded-lg px-3 py-2">
+            {fehler}
+          </p>
+        )}
 
         <div className="flex gap-2 pt-2">
           <button className="btn-ghost flex-1" onClick={onAbbrechen}>
