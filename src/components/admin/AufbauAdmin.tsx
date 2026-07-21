@@ -13,6 +13,7 @@ type Benutzer = {
   darfZahlen: boolean;
   darfStornieren: boolean;
   aktiv: boolean;
+  hatPin: boolean;
   arbeitsbereichIds: string[];
 };
 type Bereich = { id: string; name: string; icon: string | null; aktiv: boolean };
@@ -25,6 +26,9 @@ type FormState = {
   anzeigename: string;
   rolle: Rolle;
   passwort: string;
+  pin: string;
+  pinGesetzt: boolean;
+  pinEntfernen: boolean;
   darfZahlen: boolean;
   darfStornieren: boolean;
   aktiv: boolean;
@@ -83,6 +87,9 @@ export function AufbauAdmin() {
       anzeigename: "",
       rolle: "KELLNER",
       passwort: "",
+      pin: "",
+      pinGesetzt: false,
+      pinEntfernen: false,
       darfZahlen: false,
       darfStornieren: false,
       aktiv: true,
@@ -97,6 +104,9 @@ export function AufbauAdmin() {
       anzeigename: b.anzeigename ?? "",
       rolle: b.rolle as Rolle,
       passwort: "",
+      pin: "",
+      pinGesetzt: b.hatPin,
+      pinEntfernen: false,
       darfZahlen: b.darfZahlen,
       darfStornieren: b.darfStornieren,
       aktiv: b.aktiv,
@@ -114,6 +124,10 @@ export function AufbauAdmin() {
       setFehler("Bitte ein Passwort (mind. 4 Zeichen) vergeben.");
       return;
     }
+    if (form.pin && !/^\d{4,6}$/.test(form.pin)) {
+      setFehler("Die PIN muss aus 4–6 Ziffern bestehen.");
+      return;
+    }
     setSpeichern(true);
     setFehler(null);
     const body: Record<string, unknown> = {
@@ -126,6 +140,9 @@ export function AufbauAdmin() {
       arbeitsbereichIds: form.arbeitsbereichIds,
     };
     if (form.passwort) body.passwort = form.passwort;
+    // PIN: entfernen (leer) hat Vorrang; sonst nur bei Eingabe setzen.
+    if (form.pinEntfernen) body.pin = "";
+    else if (form.pin) body.pin = form.pin;
     try {
       if (form.id) {
         await jsonFetch(`/api/admin/benutzer/${form.id}`, { method: "PATCH", body: JSON.stringify(body) });
@@ -738,6 +755,35 @@ function PersonEditor({
             onChange={(e) => setForm({ ...form, passwort: e.target.value })}
             autoComplete="new-password"
           />
+        </label>
+
+        {/* PIN für den Schnell-Login am Tablet */}
+        <label className="block">
+          <span className="text-sm text-neutral-400">
+            PIN (6 Ziffern, für Schnell-Login){form.pinGesetzt ? " – gesetzt" : ""}
+          </span>
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={6}
+            className="input mt-1 tracking-widest"
+            value={form.pin}
+            onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, "").slice(0, 6), pinEntfernen: false })}
+            placeholder={form.pinGesetzt ? "•••••• (leer = unverändert)" : "z. B. 246810"}
+            autoComplete="off"
+            disabled={form.pinEntfernen}
+          />
+          {form.pinGesetzt && (
+            <label className="mt-1 flex items-center gap-2 text-xs text-neutral-400">
+              <input
+                type="checkbox"
+                className="accent-brand-600 h-3.5 w-3.5"
+                checked={form.pinEntfernen}
+                onChange={(e) => setForm({ ...form, pinEntfernen: e.target.checked, pin: "" })}
+              />
+              PIN entfernen
+            </label>
+          )}
         </label>
 
         {/* Funktions-Rechte */}

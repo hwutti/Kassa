@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ok, fehler, handleError } from "@/lib/api";
 import { getSession } from "@/lib/auth";
-import { hashPasswort } from "@/lib/passwort";
+import { hashPasswort, verifyPasswort } from "@/lib/passwort";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +11,8 @@ const UpdateSchema = z.object({
   benutzername: z.string().trim().min(1).max(100).optional(),
   anzeigename: z.string().trim().max(100).nullable().optional(),
   passwort: z.string().min(4).max(200).optional(), // gesetzt = Passwort zurücksetzen
+  // PIN: 4–6 Ziffern setzen, leerer String/null = PIN entfernen.
+  pin: z.string().regex(/^\d{4,6}$/).or(z.literal("")).nullable().optional(),
   rolle: z.enum(["ADMIN", "KELLNER", "BEREICH", "KASSA", "SUPERVISOR"]).optional(),
   darfZahlen: z.boolean().optional(),
   darfStornieren: z.boolean().optional(),
@@ -68,6 +70,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (daten.darfStornieren !== undefined) data.darfStornieren = daten.darfStornieren;
     if (daten.aktiv !== undefined) data.aktiv = daten.aktiv;
     if (daten.passwort !== undefined) data.passwortHash = hashPasswort(daten.passwort);
+    // PIN: leerer String/null entfernt sie; sonst 4–6 Ziffern setzen (muss eindeutig sein).
+    if (daten.pin !== undefined) {
+      if (!daten.pin) {
+        data.pinHash = null;
+      } else {
+        const kandidaten = await prisma.benutzer.findMany({
+          where: { pinHash: { not: null }, NOT: { id } },
+          select: { pinHash: true },
+        });
+        if (kandidaten.some((b) => b.pinHash && verifyPasswort(daten.pin as string, b.pinHash))) {
+          return fehler("Diese PIN ist bereits vergeben. Bitte eine andere wählen.", 409);
+        }
+        data.pinHash = hashPasswort(daten.pin);
+      }
+    }
 
     try {
       const benutzer = await prisma.$transaction(async (tx) => {

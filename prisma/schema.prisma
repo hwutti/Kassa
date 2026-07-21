@@ -195,6 +195,7 @@ model Benutzer {
   benutzername  String   @unique
   anzeigename   String?
   passwortHash  String // scrypt-Hash (Salt:Hash), niemals Klartext
+  pinHash       String? // optionaler PIN-Login (scrypt-Hash), für schnelles Anmelden am Tablet
   rolle         String   @default("ADMIN") // ADMIN | KELLNER | BEREICH | KASSA | SUPERVISOR
   darfZahlen    Boolean  @default(false)
   darfStornieren Boolean @default(false)
