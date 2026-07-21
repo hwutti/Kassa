@@ -41,7 +41,14 @@ export async function GET() {
             createdAt: true,
             kellner: { select: { anzeigename: true, benutzername: true } },
             positionen: {
-              select: { produktName: true, menge: true, notiz: true, arbeitsbereichId: true, status: true },
+              select: {
+                produktName: true,
+                menge: true,
+                notiz: true,
+                arbeitsbereichId: true,
+                status: true,
+                produkt: { select: { bildUrl: true, icon: true } },
+              },
             },
           },
         },
@@ -63,7 +70,13 @@ export async function GET() {
       bestellzeit: t.bestellung.createdAt.toISOString(),
       positionen: t.bestellung.positionen
         .filter((p) => p.arbeitsbereichId === t.arbeitsbereichId)
-        .map((p) => ({ produktName: p.produktName, menge: p.menge, notiz: p.notiz })),
+        .map((p) => ({
+          produktName: p.produktName,
+          menge: p.menge,
+          notiz: p.notiz,
+          bildUrl: p.produkt?.bildUrl ?? null,
+          icon: p.produkt?.icon ?? null,
+        })),
     }));
 
     const bereiche = [...new Map(tickets.map((t) => [t.arbeitsbereich.id, t.arbeitsbereich.name])).entries()].map(

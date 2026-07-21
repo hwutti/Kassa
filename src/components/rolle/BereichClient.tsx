@@ -17,7 +17,7 @@ type Ticket = {
   notiz: string | null;
   kellner: string;
   bestellzeit: string;
-  positionen: { produktName: string; menge: number; notiz: string | null }[];
+  positionen: { produktName: string; menge: number; notiz: string | null; bildUrl: string | null; icon: string | null }[];
 };
 
 function minuten(iso: string): number {
@@ -99,11 +99,21 @@ export function BereichClient() {
                           {t.abholnummer ? ` · Abhol-Nr. ${t.abholnummer}` : ""}
                           {t.gast ? ` · ${t.gast}` : ""}
                         </div>
-                        <ul className="mt-2 text-sm space-y-0.5">
+                        <ul className="mt-2 text-sm space-y-1">
                           {t.positionen.map((p, i) => (
-                            <li key={i}>
-                              <span className="font-medium">{p.menge}×</span> {p.produktName}
-                              {p.notiz && <span className="text-amber-300"> — {p.notiz}</span>}
+                            <li key={i} className="flex items-center gap-2">
+                              <span className="h-9 w-9 shrink-0 rounded bg-neutral-800 flex items-center justify-center overflow-hidden">
+                                {p.bildUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={p.bildUrl} alt="" className="h-full w-full object-cover" />
+                                ) : (
+                                  <span className="text-lg">{p.icon || "🍽️"}</span>
+                                )}
+                              </span>
+                              <span className="min-w-0">
+                                <span className="font-medium">{p.menge}×</span> {p.produktName}
+                                {p.notiz && <span className="text-amber-300"> — {p.notiz}</span>}
+                              </span>
                             </li>
                           ))}
                         </ul>
