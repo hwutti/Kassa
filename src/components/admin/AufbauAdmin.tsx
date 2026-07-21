@@ -447,28 +447,75 @@ function PlanAnsicht({
       g.sitze.push({ key: g.key + "_add", label: "+", title: "hinzufügen", farbe: g.farbe, aktiv: true, add: true, onClick: add });
     }
 
-    const total = gruppen.reduce((s, g) => s + g.sitze.length, 0) || 1;
-    const R = Math.max(150, Math.min(360, Math.round(9.8 * total)));
-    const cx = R + 44, cy = R + 50, slot = 180 / total;
+    // Flache Sitzliste in Gruppen-Reihenfolge + Startindex je Gruppe.
+    const flach: Sitz[] = [];
+    const grenzen: number[] = [];
+    for (const g of gruppen) {
+      grenzen.push(flach.length);
+      for (const s of g.sitze) flach.push(s);
+    }
+    const total = flach.length || 1;
     const rad = (deg: number) => (deg * Math.PI) / 180;
 
-    let k = 0;
-    const sitze: { x: number; y: number; s: Sitz }[] = [];
-    const trenner: { x1: number; y1: number; x2: number; y2: number }[] = [];
-    const labels: { x: number; y: number; text: string }[] = [];
-    for (const g of gruppen) {
-      const startK = k;
-      const thB = rad(180 - startK * slot);
-      trenner.push({ x1: cx + 62 * Math.cos(thB), y1: cy - 62 * Math.sin(thB), x2: cx + (R + 16) * Math.cos(thB), y2: cy - (R + 16) * Math.sin(thB) });
-      for (const s of g.sitze) {
-        const th = rad(180 - (k + 0.5) * slot);
-        sitze.push({ x: cx + R * Math.cos(th), y: cy - R * Math.sin(th), s });
-        k++;
+    // Ein Ring, solange alles bequem draufpasst; darüber automatisch konzentrische
+    // Ringe (wie Sitzreihen), damit es auch bei vielen Plätzen kompakt bleibt.
+    const pitch = 34, ringGap = 40, Rmax = 300, Rmin = 150;
+    const capAt = (r: number) => Math.max(4, Math.floor((Math.PI * r) / pitch));
+    const einRingR = Math.round((pitch * total) / Math.PI);
+    let ringe: { r: number; count: number }[];
+    if (einRingR <= Rmax) {
+      ringe = [{ r: Math.max(Rmin, Math.min(Rmax, einRingR || Rmin)), count: total }];
+    } else {
+      const caps: { r: number; cap: number }[] = [];
+      for (let n = 1; n <= 6; n++) {
+        const r = Math.max(Rmin, Rmax - (n - 1) * ringGap);
+        caps.push({ r, cap: capAt(r) });
+        if (caps.reduce((s, c) => s + c.cap, 0) >= total || r <= Rmin) break;
       }
-      const thM = rad(180 - (startK + g.sitze.length / 2) * slot);
-      labels.push({ x: cx + (R + 30) * Math.cos(thM), y: cy - (R + 30) * Math.sin(thM), text: g.label });
+      const sumCap = caps.reduce((s, c) => s + c.cap, 0) || 1;
+      let rest = total;
+      ringe = caps.map((c, i) => {
+        const cnt = i === caps.length - 1 ? rest : Math.min(rest, Math.round((total * c.cap) / sumCap));
+        rest -= cnt;
+        return { r: c.r, count: cnt };
+      });
     }
-    return { gruppen, sitze, trenner, labels, cx, cy, vbW: 2 * R + 88, vbH: R + 82 };
+    const mehrring = ringe.length > 1;
+    const outerR = ringe[0].r;
+    const cx = outerR + 44, cy = outerR + 50;
+
+    let idx = 0;
+    const sitze: { x: number; y: number; s: Sitz }[] = [];
+    for (const ring of ringe) {
+      const slot = 180 / Math.max(ring.count, 1);
+      for (let j = 0; j < ring.count; j++) {
+        const s = flach[idx++];
+        if (!s) break;
+        const th = rad(180 - (j + 0.5) * slot);
+        sitze.push({ x: cx + ring.r * Math.cos(th), y: cy - ring.r * Math.sin(th), s });
+      }
+    }
+
+    // Sektions-Label am jeweils ersten Platz, leicht nach außen versetzt.
+    const labels: { x: number; y: number; text: string }[] = [];
+    gruppen.forEach((g, gi) => {
+      const p = sitze[grenzen[gi]];
+      if (!p) return;
+      const dx = p.x - cx, dy = p.y - cy, len = Math.hypot(dx, dy) || 1;
+      labels.push({ x: p.x + (dx / len) * 22, y: p.y + (dy / len) * 22, text: g.label });
+    });
+    // Trennlinien nur im Ein-Ring-Modus (bei mehreren Ringen genügen Farbe + Legende).
+    const trenner: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    if (!mehrring) {
+      let k = 0;
+      const slot = 180 / total;
+      for (const g of gruppen) {
+        const thB = rad(180 - k * slot);
+        trenner.push({ x1: cx + 62 * Math.cos(thB), y1: cy - 62 * Math.sin(thB), x2: cx + (outerR + 16) * Math.cos(thB), y2: cy - (outerR + 16) * Math.sin(thB) });
+        k += g.sitze.length;
+      }
+    }
+    return { gruppen, sitze, trenner, labels, cx, cy, vbW: 2 * outerR + 88, vbH: outerR + 82 };
   }, [benutzer, bereiche, drucker, onPerson, onNeuPerson, onDrucker, onNeuDrucker]);
 
   const { sitze, trenner, labels, cx, cy, vbW, vbH, gruppen } = layout;
