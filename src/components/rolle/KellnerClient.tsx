@@ -19,6 +19,7 @@ type MeineBestellung = {
   tisch: string | null;
   gast: string | null;
   abholnummer: string | null;
+  verkaeufer?: string;
   summeCent: number;
   bestellStatus: string;
   zahlungStatus: string;
@@ -34,7 +35,7 @@ function uuid() {
 
 export function KellnerClient() {
   const dialog = useDialog();
-  const [tab, setTab] = useState<"neu" | "meine">("neu");
+  const [tab, setTab] = useState<"neu" | "meine" | "ausgabe">("neu");
 
   // Produkte / Warenkorb
   const [kategorien, setKategorien] = useState<Kat[]>([]);
@@ -48,8 +49,9 @@ export function KellnerClient() {
   const [senden, setSenden] = useState(false);
   const clientRef = useRef(uuid());
 
-  // Meine Bestellungen
+  // Meine Bestellungen + geteilte Ausgabe-Liste
   const [meine, setMeine] = useState<MeineBestellung[]>([]);
+  const [ausgabe, setAusgabe] = useState<MeineBestellung[]>([]);
   const [erledigtHeute, setErledigtHeute] = useState(0);
   const [darfZahlen, setDarfZahlen] = useState(true);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -84,10 +86,22 @@ export function KellnerClient() {
       setFehler((e as Error).message);
     }
   }, []);
-  useEffect(() => {
+  const ladeAusgabe = useCallback(async () => {
+    try {
+      const d = await jsonFetch<{ bestellungen: MeineBestellung[] }>("/api/kellner/ausgabe");
+      setAusgabe(d.bestellungen);
+    } catch {
+      /* Ausgabe-Liste ist ergänzend; Fehler nicht hart anzeigen */
+    }
+  }, []);
+  const aktualisieren = useCallback(() => {
     ladeMeine();
-  }, [ladeMeine]);
-  useLive(ladeMeine);
+    ladeAusgabe();
+  }, [ladeMeine, ladeAusgabe]);
+  useEffect(() => {
+    aktualisieren();
+  }, [aktualisieren]);
+  useLive(aktualisieren);
 
   const gefiltert = useMemo(() => {
     const q = suche.trim().toLowerCase();
@@ -144,7 +158,7 @@ export function KellnerClient() {
       setGast("");
       setNotiz("");
       setTab("meine");
-      ladeMeine();
+      aktualisieren();
     } catch (e) {
       setFehler((e as Error).message);
     } finally {
@@ -155,7 +169,7 @@ export function KellnerClient() {
   async function aktion(id: string, pfad: string, body?: unknown) {
     try {
       await jsonFetch(`/api/bestellungen/${id}/${pfad}`, { method: "POST", body: JSON.stringify(body ?? {}) });
-      ladeMeine();
+      aktualisieren();
     } catch (e) {
       await dialog.alert({ titel: "Fehler", text: (e as Error).message });
     }
@@ -170,24 +184,24 @@ export function KellnerClient() {
         body: JSON.stringify({ gegebenCent, art }),
       });
       setZahlFuer(null);
-      ladeMeine();
+      aktualisieren();
     } catch (e) {
       setZahlFehler((e as Error).message);
     } finally {
       setZahlLaedt(false);
     }
   }
-  async function fertigstellen(b: MeineBestellung) {
+  async function ausgeben(b: MeineBestellung) {
     const offene = b.bereiche.filter((a) => a.status !== "READY" && a.status !== "COLLECTED");
     if (offene.length > 0) {
       const ok = await dialog.confirm({
-        titel: `Bestellung Nr. ${b.nummer} abschließen?`,
-        text: `Noch nicht fertig gemeldet: ${offene.map((a) => a.name).join(", ")}. Trotzdem als ausgeliefert abschließen?`,
-        bestaetigenText: "Abschließen",
+        titel: `Nr. ${b.nummer} ohne Zubereitung ausgeben?`,
+        text: `Noch nicht fertig gemeldet: ${offene.map((a) => a.name).join(", ")}. Trotzdem ausgeben?`,
+        bestaetigenText: "Ausgeben",
       });
       if (!ok) return;
     }
-    aktion(b.id, "fertigstellen");
+    aktion(b.id, "ausgeben");
   }
 
   return (
@@ -200,13 +214,16 @@ export function KellnerClient() {
           <button className={`pill-tab ${tab === "meine" ? "on" : ""}`} onClick={() => setTab("meine")}>
             Meine ({meine.length})
           </button>
+          <button className={`pill-tab ${tab === "ausgabe" ? "on" : ""}`} onClick={() => setTab("ausgabe")}>
+            Ausgabe ({ausgabe.length})
+          </button>
         </div>
         <InstallButton />
       </RollenHeader>
 
       {fehler && <p className="text-red-300 text-sm px-3 pt-2">{fehler}</p>}
 
-      {tab === "neu" ? (
+      {tab === "neu" && (
         <div className="flex-1 flex min-h-0">
           <main className="flex-1 min-w-0 flex flex-col">
             <div className="shrink-0 p-3 border-b border-neutral-800 space-y-2">
@@ -330,7 +347,9 @@ export function KellnerClient() {
             </div>
           </aside>
         </div>
-      ) : (
+      )}
+
+      {tab === "meine" && (
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
           {/* Übersicht: Kennzahlen */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -395,11 +414,56 @@ export function KellnerClient() {
                       </button>
                     )}
                     {!ausgeliefert && (
-                      <button className="btn-primary py-1.5 text-sm" onClick={() => fertigstellen(b)}>
-                        Fertigstellen
+                      <button className="btn-primary py-1.5 text-sm" onClick={() => ausgeben(b)}>
+                        Ausgeben
                       </button>
                     )}
                   </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tab === "ausgabe" && (
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          <p className="text-sm text-neutral-400">
+            Abholbereite Bestellungen – jeder Kellner kann sie ausgeben (holen &amp; zum Tisch bringen).
+          </p>
+          {ausgabe.length === 0 && (
+            <p className="text-neutral-400 text-center py-8">Nichts abholbereit. 🎉</p>
+          )}
+          {ausgabe.map((b) => {
+            const bezahlt = b.zahlungStatus === "PAID";
+            return (
+              <div key={b.id} className="card p-3 border-l-4 border-brand-600">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="font-semibold">
+                    Nr. {b.nummer}
+                    {b.tisch ? ` · Tisch ${b.tisch}` : b.abholnummer ? ` · Nr. ${b.abholnummer}` : ""}
+                    {b.gast ? ` · ${b.gast}` : ""}
+                  </span>
+                  <span className="badge bg-brand-600/20 text-brand-50">Abholbereit</span>
+                </div>
+                <div className="mt-1 text-xs text-neutral-400">
+                  Aufgenommen von {b.verkaeufer ?? "—"} · {formatCent(b.summeCent)} · {bezahlt ? "bezahlt ✓" : "Zahlung offen"}
+                </div>
+                <div className="mt-2 flex items-center gap-2 flex-wrap justify-end">
+                  {!bezahlt && darfZahlen && (
+                    <button
+                      className="btn-ghost py-1.5 text-sm"
+                      onClick={() => {
+                        setZahlFehler(null);
+                        setZahlFuer(b);
+                      }}
+                    >
+                      Kassieren
+                    </button>
+                  )}
+                  <button className="btn-primary py-1.5 text-sm" onClick={() => ausgeben(b)}>
+                    Ausgeben
+                  </button>
                 </div>
               </div>
             );
