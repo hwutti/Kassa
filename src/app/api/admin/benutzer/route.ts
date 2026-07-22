@@ -5,6 +5,7 @@ import { ok, fehler, handleError } from "@/lib/api";
 import { randomBytes } from "node:crypto";
 import { getSession } from "@/lib/auth";
 import { hashPasswort, verifyPasswort } from "@/lib/passwort";
+import { pinVerschluesseln, pinEntschluesseln } from "@/lib/pin";
 
 /** Prüft, ob die PIN bereits von einem anderen Benutzer verwendet wird (PIN identifiziert die Person). */
 async function pinVergeben(pin: string, ausserId?: string): Promise<boolean> {
@@ -31,6 +32,7 @@ export async function GET() {
         darfStornieren: true,
         aktiv: true,
         pinHash: true,
+        pinEnc: true,
         letzterLogin: true,
         arbeitsbereiche: { select: { arbeitsbereichId: true } },
       },
@@ -45,6 +47,7 @@ export async function GET() {
         darfStornieren: b.darfStornieren,
         aktiv: b.aktiv,
         hatPin: b.pinHash !== null,
+        pin: pinEntschluesseln(b.pinEnc),
         letzterLogin: b.letzterLogin?.toISOString() ?? null,
         arbeitsbereichIds: b.arbeitsbereiche.map((a) => a.arbeitsbereichId),
       })),
@@ -106,6 +109,7 @@ export async function POST(req: Request) {
           anzeigename: daten.anzeigename ?? null,
           passwortHash: hashPasswort(passwortKlar),
           pinHash: daten.pin ? hashPasswort(daten.pin) : null,
+          pinEnc: daten.pin ? pinVerschluesseln(daten.pin) : null,
           rolle: daten.rolle,
           darfZahlen: daten.darfZahlen ?? false,
           darfStornieren: daten.darfStornieren ?? false,

@@ -14,6 +14,7 @@ type Benutzer = {
   darfStornieren: boolean;
   aktiv: boolean;
   hatPin: boolean;
+  pin: string | null;
   arbeitsbereichIds: string[];
 };
 type Bereich = { id: string; name: string; icon: string | null; aktiv: boolean };
@@ -317,12 +318,13 @@ export function AufbauAdmin() {
           doc.addPage();
           y = 20;
         }
-        const pin = pins[b.id] ? pins[b.id] : b.hatPin ? "(gesetzt)" : "—";
+        const pin = pins[b.id] || b.pin || "—";
         doc.text((b.anzeigename || b.benutzername).slice(0, 28), cx[0], y);
         doc.text((ROLLEN_LABEL[b.rolle as Rolle] ?? b.rolle).slice(0, 20), cx[1], y);
         doc.text("@" + b.benutzername, cx[2], y);
-        doc.setFont("courier", pins[b.id] ? "bold" : "normal");
-        doc.setFontSize(pins[b.id] ? 12 : 10);
+        const hatPin = Boolean(pins[b.id] || b.pin);
+        doc.setFont("courier", hatPin ? "bold" : "normal");
+        doc.setFontSize(hatPin ? 12 : 10);
         doc.text(pin, cx[3], y);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(10);
@@ -330,7 +332,7 @@ export function AufbauAdmin() {
       }
       doc.setFontSize(8);
       doc.setTextColor(120);
-      doc.text('„(gesetzt)" = PIN vorhanden, aber aus Sicherheitsgründen nicht anzeigbar – bei Bedarf neu erzeugen.', mx, 292);
+      doc.text("PIN am Anmelde-Bildschirm eingeben. Bitte vertraulich behandeln.", mx, 292);
 
       const blobUrl = doc.output("bloburl") as unknown as string;
       if (tab) tab.location.href = blobUrl;
@@ -531,8 +533,8 @@ function ZugaengeListe({
           <span className="ml-auto text-xs text-neutral-500">{liste.length} aktive Personen</span>
         </div>
         <p className="text-sm text-neutral-400 mb-3">
-          Personal meldet sich am Tablet per <b>PIN</b> an. Bereits gesetzte PINs sind aus Sicherheitsgründen nicht
-          mehr lesbar – bei Bedarf neu erzeugen (dann hier einmalig sichtbar) und ausdrucken.
+          Personal meldet sich am Tablet per <b>PIN</b> an. Die Liste zeigt die PINs zum Weitergeben/Ausdrucken –
+          bitte vertraulich behandeln. „—" = noch keine PIN, dann „PIN erzeugen".
         </p>
 
         <div className="flex-1 overflow-y-auto -mx-1 px-1">
@@ -553,10 +555,8 @@ function ZugaengeListe({
                   <td className="py-1.5 pr-2 text-neutral-400">{ROLLEN_LABEL[b.rolle as Rolle] ?? b.rolle}</td>
                   <td className="py-1.5 pr-2 font-mono">@{b.benutzername}</td>
                   <td className="py-1.5 pr-2 font-mono tabular-nums">
-                    {pins[b.id] ? (
-                      <span className="text-brand-50 font-bold text-base">{pins[b.id]}</span>
-                    ) : b.hatPin ? (
-                      <span className="text-neutral-500">••••••</span>
+                    {pins[b.id] || b.pin ? (
+                      <span className="text-brand-50 font-bold text-base">{pins[b.id] || b.pin}</span>
                     ) : (
                       <span className="text-neutral-600">—</span>
                     )}

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, fehler, handleError } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { hashPasswort, verifyPasswort } from "@/lib/passwort";
+import { pinVerschluesseln } from "@/lib/pin";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (daten.pin !== undefined) {
       if (!daten.pin) {
         data.pinHash = null;
+        data.pinEnc = null;
       } else {
         const kandidaten = await prisma.benutzer.findMany({
           where: { pinHash: { not: null }, NOT: { id } },
@@ -83,6 +85,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           return fehler("Diese PIN ist bereits vergeben. Bitte eine andere wählen.", 409);
         }
         data.pinHash = hashPasswort(daten.pin);
+        data.pinEnc = pinVerschluesseln(daten.pin);
       }
     }
 
