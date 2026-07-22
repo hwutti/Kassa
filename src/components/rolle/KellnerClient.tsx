@@ -64,6 +64,9 @@ export function KellnerClient() {
   const [zahlFehler, setZahlFehler] = useState<string | null>(null);
   const [sumupKey, setSumupKey] = useState<string | null>(null);
 
+  // Ablauf fürs Fest (aus der Verwaltung). SZENARIO_1 = ein Kellner macht alles;
+  // SZENARIO_2 = aufnehmen + sofort kassieren, Läufer liefert aus.
+  const [bedienungsmodus, setBedienungsmodus] = useState<"SZENARIO_1" | "SZENARIO_2">("SZENARIO_1");
   // Verkaufsart auf dem "Neue Bestellung"-Tab: Bedienung (Tisch) oder Direkt (Tresen).
   const [verkaufsart, setVerkaufsart] = useState<"bedienung" | "direkt">("bedienung");
   const [direktOffen, setDirektOffen] = useState(false);
@@ -85,8 +88,11 @@ export function KellnerClient() {
         setProdukte(d.produkte);
       })
       .catch((e) => setFehler((e as Error).message));
-    jsonFetch<{ sumupAffiliateKey: string | null }>("/api/kasse/konfig")
-      .then((k) => setSumupKey(k.sumupAffiliateKey))
+    jsonFetch<{ sumupAffiliateKey: string | null; bedienungsmodus?: string }>("/api/kasse/konfig")
+      .then((k) => {
+        setSumupKey(k.sumupAffiliateKey);
+        if (k.bedienungsmodus === "SZENARIO_2") setBedienungsmodus("SZENARIO_2");
+      })
       .catch(() => undefined);
     jsonFetch<{ titel?: string; untertitel?: string | null; logoUrl?: string | null; aktiveVeranstaltung?: { name: string } | null }>(
       "/api/konfiguration",
@@ -169,16 +175,20 @@ export function KellnerClient() {
     setSenden(true);
     setFehler(null);
     try {
-      await jsonFetch("/api/kellner/bestellungen", {
-        method: "POST",
-        body: JSON.stringify({
-          clientRef: clientRef.current,
-          tisch: tisch.trim() || null,
-          gast: gast.trim() || null,
-          notiz: notiz.trim() || null,
-          positionen: positionen.map((p) => ({ produktId: p.produktId, menge: p.menge })),
-        }),
-      });
+      const res = await jsonFetch<{ bestellung: { id: string; nummer: number; tisch: string | null; summeCent: number; bestellStatus: string } }>(
+        "/api/kellner/bestellungen",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            clientRef: clientRef.current,
+            tisch: tisch.trim() || null,
+            gast: gast.trim() || null,
+            notiz: notiz.trim() || null,
+            positionen: positionen.map((p) => ({ produktId: p.produktId, menge: p.menge })),
+          }),
+        },
+      );
+      const neu = res.bestellung;
       clientRef.current = uuid();
       setKorb({});
       setTisch("");
@@ -186,6 +196,22 @@ export function KellnerClient() {
       setNotiz("");
       setTab("meine");
       aktualisieren();
+      // Szenario 2: sofort kassieren – Bezahl-Dialog für die neue Bestellung öffnen.
+      if (bedienungsmodus === "SZENARIO_2" && darfZahlen) {
+        setZahlFehler(null);
+        setZahlFuer({
+          id: neu.id,
+          nummer: neu.nummer,
+          tisch: neu.tisch,
+          gast: null,
+          abholnummer: null,
+          summeCent: neu.summeCent,
+          bestellStatus: neu.bestellStatus,
+          zahlungStatus: "UNPAID",
+          auslieferungStatus: "NOT_READY",
+          bereiche: [],
+        });
+      }
     } catch (e) {
       setFehler((e as Error).message);
     } finally {
@@ -306,9 +332,12 @@ export function KellnerClient() {
           <button className={`pill-tab ${tab === "meine" ? "on" : ""}`} onClick={() => setTab("meine")}>
             Meine ({meine.length})
           </button>
-          <button className={`pill-tab ${tab === "ausgabe" ? "on" : ""}`} onClick={() => setTab("ausgabe")}>
-            Ausgabe ({ausgabe.length})
-          </button>
+          {/* Szenario 2: gemeinsamer Läufer-Pool. In Szenario 1 liefert jeder seine eigenen (über „Meine"). */}
+          {bedienungsmodus === "SZENARIO_2" && (
+            <button className={`pill-tab ${tab === "ausgabe" ? "on" : ""}`} onClick={() => setTab("ausgabe")}>
+              Ausgabe ({ausgabe.length})
+            </button>
+          )}
         </div>
         <InstallButton />
       </RollenHeader>

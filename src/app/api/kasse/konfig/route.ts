@@ -18,6 +18,7 @@ export async function GET() {
       {
         sumupAffiliateKey: e.sumupAffiliateKey ?? null,
         bonAutoDruck: e.bonAutoDruck,
+        bedienungsmodus: e.bedienungsmodus,
       },
       { headers: { "Cache-Control": "no-store" } },
     );

@@ -163,6 +163,10 @@ model Einstellung {
   sumupAffiliateKey String?
   // Bon nach der Zahlung automatisch drucken (Systemdrucker/Browser).
   bonAutoDruck Boolean @default(false)
+  // Bedienungs-Ablauf fürs ganze Fest (Tresen/Direktverkauf ist immer zusätzlich möglich):
+  //  SZENARIO_1 = ein Kellner nimmt auf, holt ab, liefert aus und kassiert am Ende.
+  //  SZENARIO_2 = Kellner nimmt auf + kassiert sofort; ein Läufer liefert nur noch aus.
+  bedienungsmodus String @default("SZENARIO_1")
   updatedAt  DateTime @updatedAt
 }
 

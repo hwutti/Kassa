@@ -17,6 +17,7 @@ export async function GET() {
       design: e.design,
       sumupAffiliateKey: e.sumupAffiliateKey,
       bonAutoDruck: e.bonAutoDruck,
+      bedienungsmodus: e.bedienungsmodus,
     });
   } catch (e) {
     return handleError(e);
@@ -31,6 +32,7 @@ const UpdateSchema = z.object({
   design: z.enum(["dunkel", "glas", "aurora", "modern", "cool", "mitternacht"]).optional(),
   sumupAffiliateKey: z.string().trim().max(200).nullable().optional(),
   bonAutoDruck: z.boolean().optional(),
+  bedienungsmodus: z.enum(["SZENARIO_1", "SZENARIO_2"]).optional(),
 });
 
 /** PATCH /api/admin/konfiguration – Header-Logo, Größe, Titel und Design ändern. */
@@ -47,6 +49,7 @@ export async function PATCH(req: Request) {
       design: e.design,
       sumupAffiliateKey: e.sumupAffiliateKey,
       bonAutoDruck: e.bonAutoDruck,
+      bedienungsmodus: e.bedienungsmodus,
     });
   } catch (e) {
     return handleError(e);

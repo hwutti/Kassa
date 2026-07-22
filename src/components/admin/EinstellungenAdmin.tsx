@@ -11,7 +11,21 @@ type Konfig = {
   design: string;
   sumupAffiliateKey: string | null;
   bonAutoDruck: boolean;
+  bedienungsmodus: string;
 };
+
+const MODI: { id: string; name: string; ablauf: string }[] = [
+  {
+    id: "SZENARIO_1",
+    name: "Szenario 1 – ein Kellner macht alles",
+    ablauf: "Kellner nimmt auf → Bereiche machen fertig → derselbe Kellner holt ab, liefert aus und kassiert am Ende.",
+  },
+  {
+    id: "SZENARIO_2",
+    name: "Szenario 2 – aufnehmen & kassieren, Läufer liefert",
+    ablauf: "Kellner nimmt auf und kassiert sofort → Bereiche machen fertig → ein extra Kellner (Läufer) bringt es nur noch zum Tisch.",
+  },
+];
 
 const DESIGNS: { id: string; name: string; vorschau: string }[] = [
   { id: "dunkel", name: "Standard", vorschau: "#0a0a0a" },
@@ -30,6 +44,7 @@ export function EinstellungenAdmin() {
   const [design, setDesign] = useState("dunkel");
   const [sumupKey, setSumupKey] = useState("");
   const [bonAutoDruck, setBonAutoDruck] = useState(false);
+  const [bedienungsmodus, setBedienungsmodus] = useState("SZENARIO_1");
   const [fehler, setFehler] = useState<string | null>(null);
   const [gespeichert, setGespeichert] = useState(false);
   const [ladeBild, setLadeBild] = useState(false);
@@ -44,6 +59,7 @@ export function EinstellungenAdmin() {
         setDesign(k.design ?? "dunkel");
         setSumupKey(k.sumupAffiliateKey ?? "");
         setBonAutoDruck(Boolean(k.bonAutoDruck));
+        setBedienungsmodus(k.bedienungsmodus === "SZENARIO_2" ? "SZENARIO_2" : "SZENARIO_1");
       })
       .catch((e) => setFehler((e as Error).message));
   }, []);
@@ -84,6 +100,7 @@ export function EinstellungenAdmin() {
           design,
           sumupAffiliateKey: sumupKey.trim() || null,
           bonAutoDruck,
+          bedienungsmodus,
         }),
       });
       try {
@@ -200,6 +217,39 @@ export function EinstellungenAdmin() {
           onChange={(e) => setUntertitel(e.target.value)}
         />
       </label>
+
+      {/* Betriebsart / Ablauf fürs Fest */}
+      <div className="border-t border-neutral-800 pt-4 space-y-2">
+        <h3 className="font-semibold">Ablauf fürs Fest</h3>
+        <p className="text-sm text-neutral-400">
+          So arbeiten alle Kellner bei diesem Fest. Der <strong>Tresen-/Direktverkauf</strong> (Kunde bestellt &amp;
+          zahlt direkt am Stand) ist <strong>immer zusätzlich möglich</strong> – unabhängig vom gewählten Szenario.
+        </p>
+        <div className="grid gap-2">
+          {MODI.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setBedienungsmodus(m.id)}
+              className={`rounded-xl border p-3 text-left transition ${
+                bedienungsmodus === m.id
+                  ? "border-brand-600 ring-2 ring-brand-600"
+                  : "border-neutral-700 hover:border-neutral-500"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className={`h-4 w-4 shrink-0 rounded-full border ${
+                    bedienungsmodus === m.id ? "border-brand-600 bg-brand-600" : "border-neutral-500"
+                  }`}
+                />
+                <span className="font-medium">{m.name}</span>
+              </div>
+              <p className="mt-1 text-xs text-neutral-400">{m.ablauf}</p>
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Kartenzahlung + Bondruck */}
       <div className="border-t border-neutral-800 pt-4 space-y-3">
