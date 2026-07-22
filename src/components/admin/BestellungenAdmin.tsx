@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 import { useDialog } from "@/components/ui/DialogProvider";
 import { formatCent } from "@/lib/money";
+import { druckeBon, type BonDaten } from "@/lib/bon";
 
 type Bestellung = {
   id: string;
@@ -12,13 +13,16 @@ type Bestellung = {
   summeCent: number;
   erhaltenCent: number | null;
   rueckgeldCent: number | null;
+  zahlungsart: string;
+  tisch: string | null;
+  abholnummer: string | null;
   createdAt: string;
   storniertAm: string | null;
   stornoGrund: string | null;
   storniertVon: string | null;
   verkaufsbereichName: string;
   veranstaltungName: string | null;
-  positionen: { produktName: string; menge: number; summeCent: number }[];
+  positionen: { produktName: string; menge: number; einzelpreisCent: number; summeCent: number }[];
 };
 type Veranstaltung = { id: string; name: string; aktiv: boolean };
 
@@ -30,6 +34,13 @@ export function BestellungenAdmin() {
   const [ladt, setLadt] = useState(true);
   const [fehler, setFehler] = useState<string | null>(null);
   const [nurAktive, setNurAktive] = useState(false);
+  // Für den Beleg-Nachdruck (Kopf/Logo). Der Beleg selbst wird aus den
+  // gespeicherten Daten neu erzeugt – kein Extra-Speicher pro Transaktion.
+  const [konfig, setKonfig] = useState<{ titel: string; untertitel: string | null; logoUrl: string | null }>({
+    titel: "Kirchtag",
+    untertitel: null,
+    logoUrl: null,
+  });
 
   async function laden(veranstaltungId: string) {
     setLadt(true);
@@ -52,7 +63,32 @@ export function BestellungenAdmin() {
         setFilter(vs.find((v) => v.aktiv)?.id ?? "");
       })
       .catch(() => setFilter(""));
+    jsonFetch<{ titel?: string; untertitel?: string | null; logoUrl?: string | null; aktiveVeranstaltung?: { name: string } | null }>(
+      "/api/konfiguration",
+    )
+      .then((k) =>
+        setKonfig({ titel: k.titel || "Kirchtag", untertitel: k.aktiveVeranstaltung?.name ?? k.untertitel ?? null, logoUrl: k.logoUrl ?? null }),
+      )
+      .catch(() => undefined);
   }, []);
+
+  // Beleg aus den gespeicherten Daten neu erzeugen und drucken (kein Abbild gespeichert).
+  function bonDrucken(b: Bestellung) {
+    const bon: BonDaten = {
+      titel: konfig.titel,
+      untertitel: konfig.untertitel,
+      logoUrl: konfig.logoUrl,
+      nummer: b.nummer,
+      datum: new Date(b.createdAt).toLocaleString("de-AT"),
+      tisch: b.tisch ?? b.abholnummer,
+      positionen: b.positionen,
+      summeCent: b.summeCent,
+      art: b.zahlungsart,
+      gegebenCent: b.erhaltenCent,
+      rueckgeldCent: b.rueckgeldCent,
+    };
+    druckeBon(bon);
+  }
 
   // Bei Filteränderung neu laden.
   useEffect(() => {
@@ -131,6 +167,9 @@ export function BestellungenAdmin() {
               <span className={`ml-auto font-semibold tabular-nums ${storniert ? "line-through" : ""}`}>
                 {formatCent(b.summeCent)}
               </span>
+              <button className="btn-ghost py-1.5 text-sm" onClick={() => bonDrucken(b)}>
+                Bon
+              </button>
               {!storniert && (
                 <button className="btn-ghost py-1.5 text-red-300 text-sm" onClick={() => stornieren(b)}>
                   Stornieren

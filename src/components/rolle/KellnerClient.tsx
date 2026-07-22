@@ -8,6 +8,7 @@ import { useDialog } from "@/components/ui/DialogProvider";
 import { BESTELL_STATUS_LABEL } from "@/lib/statuslogik";
 import { useLive } from "@/lib/useLive";
 import { ZahlModal } from "@/components/rolle/ZahlModal";
+import { BelegUebersicht, type Beleg } from "@/components/rolle/BelegUebersicht";
 import { InstallButton } from "@/components/kasse/InstallButton";
 import { druckeBon, type BonDaten } from "@/lib/bon";
 
@@ -62,15 +63,15 @@ export function KellnerClient() {
   const [zahlLaedt, setZahlLaedt] = useState(false);
   const [zahlFehler, setZahlFehler] = useState<string | null>(null);
   const [sumupKey, setSumupKey] = useState<string | null>(null);
-  const [bonAutoDruck, setBonAutoDruck] = useState(false);
-  // Nach dem Direktverkauf: Bestätigung/Übersicht mit bewusstem „Bon drucken".
-  const [bonDaten, setBonDaten] = useState<BonDaten | null>(null);
 
   // Verkaufsart auf dem "Neue Bestellung"-Tab: Bedienung (Tisch) oder Direkt (Tresen).
   const [verkaufsart, setVerkaufsart] = useState<"bedienung" | "direkt">("bedienung");
   const [direktOffen, setDirektOffen] = useState(false);
-  const [direktLaedt, setDirektLaedt] = useState(false);
   const [direktFehler, setDirektFehler] = useState<string | null>(null);
+  // Direktverkauf: vorläufige Rechnung (Übersicht vor dem Buchen) + Abschluss.
+  const [beleg, setBeleg] = useState<Beleg | null>(null);
+  const [abschlussLaedt, setAbschlussLaedt] = useState(false);
+  const [abschlussFehler, setAbschlussFehler] = useState<string | null>(null);
   const [konfig, setKonfig] = useState<{ titel: string; untertitel: string | null; logoUrl: string | null }>({
     titel: "Kirchtag",
     untertitel: null,
@@ -84,11 +85,8 @@ export function KellnerClient() {
         setProdukte(d.produkte);
       })
       .catch((e) => setFehler((e as Error).message));
-    jsonFetch<{ sumupAffiliateKey: string | null; bonAutoDruck: boolean }>("/api/kasse/konfig")
-      .then((k) => {
-        setSumupKey(k.sumupAffiliateKey);
-        setBonAutoDruck(k.bonAutoDruck);
-      })
+    jsonFetch<{ sumupAffiliateKey: string | null }>("/api/kasse/konfig")
+      .then((k) => setSumupKey(k.sumupAffiliateKey))
       .catch(() => undefined);
     jsonFetch<{ titel?: string; untertitel?: string | null; logoUrl?: string | null; aktiveVeranstaltung?: { name: string } | null }>(
       "/api/konfiguration",
@@ -220,10 +218,31 @@ export function KellnerClient() {
       setZahlLaedt(false);
     }
   }
-  async function bezahlenDirekt(gegebenCent: number | null, art: string) {
-    if (anzahl === 0 || direktLaedt) return;
-    setDirektLaedt(true);
-    setDirektFehler(null);
+  // Direktverkauf Schritt 1: „Bezahlen" bucht NICHT, sondern zeigt die komplette
+  // Rechnung zur Kontrolle. Rückgeld lokal berechnet (Server rechnet beim Abschluss neu).
+  function bezahlenDirekt(gegebenCent: number | null, art: string) {
+    if (anzahl === 0) return;
+    const rueckgeldCent = art === "BAR" && gegebenCent != null && gegebenCent >= summe ? gegebenCent - summe : null;
+    setBeleg({
+      positionen: positionen.map((p) => ({ produktName: p.name, menge: p.menge, einzelpreisCent: p.preisCent, summeCent: p.preisCent * p.menge })),
+      summeCent: summe,
+      art,
+      gegebenCent: art === "BAR" ? gegebenCent : null,
+      rueckgeldCent,
+    });
+    setAbschlussFehler(null);
+    setDirektOffen(false);
+  }
+  // „Korrigieren": Rechnung verwerfen, zurück in den Warenkorb (nichts gebucht).
+  function direktKorrigieren() {
+    setBeleg(null);
+    setAbschlussFehler(null);
+  }
+  // Direktverkauf Schritt 2: Verkauf jetzt buchen (erst hier entsteht der Datensatz), optional drucken.
+  async function direktAbschliessen(drucken: boolean) {
+    if (!beleg || abschlussLaedt) return;
+    setAbschlussLaedt(true);
+    setAbschlussFehler(null);
     try {
       const res = await jsonFetch<{ bestellung: { nummer: number; summeCent: number; erhaltenCent: number | null; rueckgeldCent: number | null; positionen: { produktName: string; menge: number; einzelpreisCent: number; summeCent: number }[] } }>(
         "/api/kellner/direktverkauf",
@@ -232,36 +251,36 @@ export function KellnerClient() {
           body: JSON.stringify({
             clientRef: clientRef.current,
             positionen: positionen.map((p) => ({ produktId: p.produktId, menge: p.menge })),
-            gegebenCent,
-            art,
+            gegebenCent: beleg.gegebenCent,
+            art: beleg.art,
           }),
         },
       );
       const best = res.bestellung;
-      const bon: BonDaten = {
-        titel: konfig.titel,
-        untertitel: konfig.untertitel,
-        logoUrl: konfig.logoUrl,
-        nummer: best.nummer,
-        datum: new Date().toLocaleString("de-AT"),
-        positionen: best.positionen,
-        summeCent: best.summeCent,
-        art,
-        gegebenCent: best.erhaltenCent,
-        rueckgeldCent: best.rueckgeldCent,
-      };
-      // Übersicht/Bestätigung zeigen; Druck nur automatisch, wenn so eingestellt.
-      setBonDaten(bon);
-      if (bonAutoDruck) druckeBon(bon);
+      if (drucken) {
+        const bon: BonDaten = {
+          titel: konfig.titel,
+          untertitel: konfig.untertitel,
+          logoUrl: konfig.logoUrl,
+          nummer: best.nummer,
+          datum: new Date().toLocaleString("de-AT"),
+          positionen: best.positionen,
+          summeCent: best.summeCent,
+          art: beleg.art,
+          gegebenCent: best.erhaltenCent,
+          rueckgeldCent: best.rueckgeldCent,
+        };
+        druckeBon(bon);
+      }
       clientRef.current = uuid();
       setKorb({});
       setNotiz("");
-      setDirektOffen(false);
+      setBeleg(null);
       aktualisieren();
     } catch (e) {
-      setDirektFehler((e as Error).message);
+      setAbschlussFehler((e as Error).message);
     } finally {
-      setDirektLaedt(false);
+      setAbschlussLaedt(false);
     }
   }
   async function ausgeben(b: MeineBestellung) {
@@ -605,7 +624,7 @@ export function KellnerClient() {
           titel="Direktverkauf kassieren"
           summeCent={summe}
           positionen={positionen.map((p) => ({ produktName: p.name, menge: p.menge, einzelpreisCent: p.preisCent, summeCent: p.preisCent * p.menge }))}
-          laedt={direktLaedt}
+          laedt={false}
           fehler={direktFehler}
           sumupAffiliateKey={sumupKey}
           onAbbrechen={() => setDirektOffen(false)}
@@ -613,29 +632,15 @@ export function KellnerClient() {
         />
       )}
 
-      {bonDaten && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="card w-full max-w-xs p-5 space-y-4 text-center">
-            <div className="mx-auto h-12 w-12 rounded-full flex items-center justify-center text-2xl bg-brand-600/20 text-brand-50">
-              ✓
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold">Zahlung erfasst</h2>
-              <p className="text-sm text-neutral-400">
-                Nr. {bonDaten.nummer} · {formatCent(bonDaten.summeCent)}
-                {bonDaten.rueckgeldCent !== null ? ` · Rückgeld ${formatCent(bonDaten.rueckgeldCent)}` : ""}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button className="btn-ghost flex-1" onClick={() => setBonDaten(null)}>
-                Fertig
-              </button>
-              <button className="btn-primary flex-1" onClick={() => druckeBon(bonDaten)}>
-                Bon drucken
-              </button>
-            </div>
-          </div>
-        </div>
+      {beleg && (
+        <BelegUebersicht
+          beleg={beleg}
+          laedt={abschlussLaedt}
+          fehler={abschlussFehler}
+          onKorrigieren={direktKorrigieren}
+          onFertig={() => direktAbschliessen(false)}
+          onDrucken={() => direktAbschliessen(true)}
+        />
       )}
     </div>
   );
