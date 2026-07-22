@@ -18,7 +18,8 @@ const PositionSchema = z.object({
 });
 const BestellungSchema = z.object({
   clientRef: z.string().min(8).max(64),
-  tisch: z.string().trim().max(60).nullable().optional(),
+  // Tisch/Abholnummer ist Pflicht – sonst ist unklar, wohin ausgegeben wird.
+  tisch: z.string().trim().min(1, "Bitte einen Tisch angeben.").max(60),
   gast: z.string().trim().max(80).nullable().optional(),
   abholnummer: z.string().trim().max(30).nullable().optional(),
   notiz: z.string().trim().max(300).nullable().optional(),

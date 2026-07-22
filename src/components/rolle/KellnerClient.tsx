@@ -139,6 +139,10 @@ export function KellnerClient() {
 
   async function absenden() {
     if (anzahl === 0 || senden) return;
+    if (!tisch.trim()) {
+      setFehler("Bitte einen Tisch / eine Abholnummer angeben – sonst ist unklar, wohin ausgegeben wird.");
+      return;
+    }
     setSenden(true);
     setFehler(null);
     try {
@@ -310,8 +314,15 @@ export function KellnerClient() {
           </main>
 
           <aside className="w-80 shrink-0 border-l border-neutral-800 flex flex-col">
-            <div className="p-3 border-b border-neutral-800 space-y-2">
-              <input className="input" placeholder="Tisch / Abholnr." value={tisch} onChange={(e) => setTisch(e.target.value)} />
+            <div className="p-3 border-b border-neutral-800 space-y-1">
+              <input
+                className={`input ${!tisch.trim() ? "border-amber-500/60" : ""}`}
+                placeholder="Tisch / Abholnr. (Pflicht)"
+                value={tisch}
+                onChange={(e) => setTisch(e.target.value)}
+                aria-label="Tisch oder Abholnummer (erforderlich)"
+              />
+              {!tisch.trim() && <p className="text-[11px] text-amber-300">Pflicht – damit klar ist, wohin ausgegeben wird.</p>}
               <input className="input" placeholder="Gast (optional)" value={gast} onChange={(e) => setGast(e.target.value)} />
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
@@ -341,8 +352,8 @@ export function KellnerClient() {
                 <span className="text-neutral-300">Gesamt</span>
                 <span className="text-xl font-bold tabular-nums">{formatCent(summe)}</span>
               </div>
-              <button className="btn-primary w-full" onClick={absenden} disabled={anzahl === 0 || senden}>
-                {senden ? "Sende …" : `Bestellung absenden (${anzahl})`}
+              <button className="btn-primary w-full" onClick={absenden} disabled={anzahl === 0 || !tisch.trim() || senden}>
+                {senden ? "Sende …" : !tisch.trim() && anzahl > 0 ? "Erst Tisch angeben" : `Bestellung absenden (${anzahl})`}
               </button>
             </div>
           </aside>
