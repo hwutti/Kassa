@@ -21,6 +21,7 @@ const ARTEN: { wert: Zahlungsart; label: string; icon: string }[] = [
  */
 export function ZahlModal({
   nummer,
+  titel,
   summeCent,
   positionen,
   laedt,
@@ -30,6 +31,7 @@ export function ZahlModal({
   onBezahlen,
 }: {
   nummer: number;
+  titel?: string;
   summeCent: number;
   positionen?: Position[];
   laedt: boolean;
@@ -63,7 +65,7 @@ export function ZahlModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="card w-full max-w-md max-h-[94dvh] flex flex-col">
         <div className="shrink-0 p-4 border-b border-neutral-800">
-          <h2 className="text-lg font-semibold">Kassieren – Nr. {nummer}</h2>
+          <h2 className="text-lg font-semibold">{titel ?? `Kassieren – Nr. ${nummer}`}</h2>
           <p className="text-sm text-neutral-400">Betrag erfassen und bestätigen.</p>
         </div>
 

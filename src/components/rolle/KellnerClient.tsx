@@ -9,6 +9,7 @@ import { BESTELL_STATUS_LABEL } from "@/lib/statuslogik";
 import { useLive } from "@/lib/useLive";
 import { ZahlModal } from "@/components/rolle/ZahlModal";
 import { InstallButton } from "@/components/kasse/InstallButton";
+import { druckeBon, type BonDaten } from "@/lib/bon";
 
 type Kat = { id: string; name: string; farbe: string | null; icon: string | null };
 type Prod = { id: string; name: string; preisCent: number; icon: string | null; bildUrl: string | null; barcode: string | null; kategorieId: string };
@@ -62,6 +63,17 @@ export function KellnerClient() {
   const [zahlFehler, setZahlFehler] = useState<string | null>(null);
   const [sumupKey, setSumupKey] = useState<string | null>(null);
 
+  // Verkaufsart auf dem "Neue Bestellung"-Tab: Bedienung (Tisch) oder Direkt (Tresen).
+  const [verkaufsart, setVerkaufsart] = useState<"bedienung" | "direkt">("bedienung");
+  const [direktOffen, setDirektOffen] = useState(false);
+  const [direktLaedt, setDirektLaedt] = useState(false);
+  const [direktFehler, setDirektFehler] = useState<string | null>(null);
+  const [konfig, setKonfig] = useState<{ titel: string; untertitel: string | null; logoUrl: string | null }>({
+    titel: "Kirchtag",
+    untertitel: null,
+    logoUrl: null,
+  });
+
   useEffect(() => {
     jsonFetch<{ kategorien: Kat[]; produkte: Prod[] }>("/api/kellner/produkte")
       .then((d) => {
@@ -71,6 +83,13 @@ export function KellnerClient() {
       .catch((e) => setFehler((e as Error).message));
     jsonFetch<{ sumupAffiliateKey: string | null }>("/api/kasse/konfig")
       .then((k) => setSumupKey(k.sumupAffiliateKey))
+      .catch(() => undefined);
+    jsonFetch<{ titel?: string; untertitel?: string | null; logoUrl?: string | null; aktiveVeranstaltung?: { name: string } | null }>(
+      "/api/konfiguration",
+    )
+      .then((k) =>
+        setKonfig({ titel: k.titel || "Kirchtag", untertitel: k.aktiveVeranstaltung?.name ?? k.untertitel ?? null, logoUrl: k.logoUrl ?? null }),
+      )
       .catch(() => undefined);
   }, []);
 
@@ -195,6 +214,48 @@ export function KellnerClient() {
       setZahlLaedt(false);
     }
   }
+  async function bezahlenDirekt(gegebenCent: number | null, art: string) {
+    if (anzahl === 0 || direktLaedt) return;
+    setDirektLaedt(true);
+    setDirektFehler(null);
+    try {
+      const res = await jsonFetch<{ bestellung: { nummer: number; summeCent: number; erhaltenCent: number | null; rueckgeldCent: number | null; positionen: { produktName: string; menge: number; einzelpreisCent: number; summeCent: number }[] } }>(
+        "/api/kellner/direktverkauf",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            clientRef: clientRef.current,
+            positionen: positionen.map((p) => ({ produktId: p.produktId, menge: p.menge })),
+            gegebenCent,
+            art,
+          }),
+        },
+      );
+      const best = res.bestellung;
+      const bon: BonDaten = {
+        titel: konfig.titel,
+        untertitel: konfig.untertitel,
+        logoUrl: konfig.logoUrl,
+        nummer: best.nummer,
+        datum: new Date().toLocaleString("de-AT"),
+        positionen: best.positionen,
+        summeCent: best.summeCent,
+        art,
+        gegebenCent: best.erhaltenCent,
+        rueckgeldCent: best.rueckgeldCent,
+      };
+      druckeBon(bon);
+      clientRef.current = uuid();
+      setKorb({});
+      setNotiz("");
+      setDirektOffen(false);
+      aktualisieren();
+    } catch (e) {
+      setDirektFehler((e as Error).message);
+    } finally {
+      setDirektLaedt(false);
+    }
+  }
   async function ausgeben(b: MeineBestellung) {
     const offene = b.bereiche.filter((a) => a.status !== "READY" && a.status !== "COLLECTED");
     if (offene.length > 0) {
@@ -314,16 +375,38 @@ export function KellnerClient() {
           </main>
 
           <aside className="w-80 shrink-0 border-l border-neutral-800 flex flex-col">
-            <div className="p-3 border-b border-neutral-800 space-y-1">
-              <input
-                className={`input ${!tisch.trim() ? "border-amber-500/60" : ""}`}
-                placeholder="Tisch / Abholnr. (Pflicht)"
-                value={tisch}
-                onChange={(e) => setTisch(e.target.value)}
-                aria-label="Tisch oder Abholnummer (erforderlich)"
-              />
-              {!tisch.trim() && <p className="text-[11px] text-amber-300">Pflicht – damit klar ist, wohin ausgegeben wird.</p>}
-              <input className="input" placeholder="Gast (optional)" value={gast} onChange={(e) => setGast(e.target.value)} />
+            <div className="p-3 border-b border-neutral-800 space-y-2">
+              {darfZahlen && (
+                <div className="flex gap-1">
+                  <button
+                    className={`pill-tab flex-1 ${verkaufsart === "bedienung" ? "on" : ""}`}
+                    onClick={() => setVerkaufsart("bedienung")}
+                  >
+                    Bedienung
+                  </button>
+                  <button
+                    className={`pill-tab flex-1 ${verkaufsart === "direkt" ? "on" : ""}`}
+                    onClick={() => setVerkaufsart("direkt")}
+                  >
+                    Direkt (Tresen)
+                  </button>
+                </div>
+              )}
+              {verkaufsart === "bedienung" ? (
+                <>
+                  <input
+                    className={`input ${!tisch.trim() ? "border-amber-500/60" : ""}`}
+                    placeholder="Tisch / Abholnr. (Pflicht)"
+                    value={tisch}
+                    onChange={(e) => setTisch(e.target.value)}
+                    aria-label="Tisch oder Abholnummer (erforderlich)"
+                  />
+                  {!tisch.trim() && <p className="text-[11px] text-amber-300">Pflicht – damit klar ist, wohin ausgegeben wird.</p>}
+                  <input className="input" placeholder="Gast (optional)" value={gast} onChange={(e) => setGast(e.target.value)} />
+                </>
+              ) : (
+                <p className="text-[11px] text-neutral-400">Tresen: Kunde bestellt, bekommt &amp; zahlt direkt am Stand.</p>
+              )}
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
               {positionen.length === 0 ? (
@@ -352,9 +435,23 @@ export function KellnerClient() {
                 <span className="text-neutral-300">Gesamt</span>
                 <span className="text-xl font-bold tabular-nums">{formatCent(summe)}</span>
               </div>
-              <button className="btn-primary w-full" onClick={absenden} disabled={anzahl === 0 || !tisch.trim() || senden}>
-                {senden ? "Sende …" : !tisch.trim() && anzahl > 0 ? "Erst Tisch angeben" : `Bestellung absenden (${anzahl})`}
-              </button>
+              {verkaufsart === "direkt" ? (
+                <button
+                  className="btn-primary w-full"
+                  onClick={() => {
+                    if (anzahl === 0) return;
+                    setDirektFehler(null);
+                    setDirektOffen(true);
+                  }}
+                  disabled={anzahl === 0}
+                >
+                  Kassieren ({formatCent(summe)})
+                </button>
+              ) : (
+                <button className="btn-primary w-full" onClick={absenden} disabled={anzahl === 0 || !tisch.trim() || senden}>
+                  {senden ? "Sende …" : !tisch.trim() && anzahl > 0 ? "Erst Tisch angeben" : `Bestellung absenden (${anzahl})`}
+                </button>
+              )}
             </div>
           </aside>
         </div>
@@ -491,6 +588,20 @@ export function KellnerClient() {
           sumupAffiliateKey={sumupKey}
           onAbbrechen={() => setZahlFuer(null)}
           onBezahlen={bezahlen}
+        />
+      )}
+
+      {direktOffen && (
+        <ZahlModal
+          nummer={0}
+          titel="Direktverkauf kassieren"
+          summeCent={summe}
+          positionen={positionen.map((p) => ({ produktName: p.name, menge: p.menge, einzelpreisCent: p.preisCent, summeCent: p.preisCent * p.menge }))}
+          laedt={direktLaedt}
+          fehler={direktFehler}
+          sumupAffiliateKey={sumupKey}
+          onAbbrechen={() => setDirektOffen(false)}
+          onBezahlen={bezahlenDirekt}
         />
       )}
     </div>
