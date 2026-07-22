@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, handleError } from "@/lib/api";
 import { verkaufbarWhere } from "@/lib/sichtbarkeit";
 import { requireRolle } from "@/lib/auth";
-import { darfKellner } from "@/lib/rollen";
+import { darfVerkaufen } from "@/lib/rollen";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -10,7 +10,7 @@ export const revalidate = 0;
 /** GET /api/kellner/produkte – alle verkaufbaren Produkte für die Bestellaufnahme. */
 export async function GET() {
   try {
-    const session = await requireRolle(darfKellner);
+    const session = await requireRolle(darfVerkaufen);
     if (session instanceof Response) return session;
 
     const produkteRaw = await prisma.produkt.findMany({

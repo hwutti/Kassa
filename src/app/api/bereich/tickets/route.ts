@@ -20,7 +20,15 @@ export async function GET() {
         select: { arbeitsbereichId: true },
       });
       areaIds = zuweisungen.map((z) => z.arbeitsbereichId);
-      if (areaIds.length === 0) return ok({ bereiche: [], tickets: [] }, { headers: { "Cache-Control": "no-store" } });
+    }
+
+    // Darf dieser Bereich am Stand direkt verkaufen/kassieren? (ADMIN/SUPERVISOR
+    // immer; BEREICH nur mit Benutzer-Recht darfZahlen.) Steuert den Tresen-Umschalter.
+    const benutzer = await prisma.benutzer.findUnique({ where: { id: session.sub }, select: { darfZahlen: true } });
+    const darfZahlen = ["ADMIN", "SUPERVISOR"].includes(session.rolle) || benutzer?.darfZahlen === true;
+
+    if (session.rolle === "BEREICH" && areaIds && areaIds.length === 0) {
+      return ok({ bereiche: [], tickets: [], darfZahlen }, { headers: { "Cache-Control": "no-store" } });
     }
 
     const tickets = await prisma.bereichsticket.findMany({
@@ -83,7 +91,7 @@ export async function GET() {
       ([id, name]) => ({ id, name }),
     );
 
-    return ok({ bereiche, tickets: ergebnis }, { headers: { "Cache-Control": "no-store" } });
+    return ok({ bereiche, tickets: ergebnis, darfZahlen }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return handleError(e);
   }

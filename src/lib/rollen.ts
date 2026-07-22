@@ -43,6 +43,14 @@ export function darfBereich(rolle?: string): boolean {
   return rolle === "ADMIN" || rolle === "BEREICH" || rolle === "SUPERVISOR";
 }
 /**
+ * Darf Produkte verkaufen – als Kellner (Bestellung aufnehmen) ODER am Stand
+ * (Bereich mit Direktverkauf). Das Kassieren selbst erfordert zusätzlich das
+ * Benutzer-Recht `darfZahlen`, das pro Zahlung serverseitig geprüft wird.
+ */
+export function darfVerkaufen(rolle?: string): boolean {
+  return darfKellner(rolle) || rolle === "BEREICH";
+}
+/**
  * Darf die zentrale Kassa bedienen (offene Bestellungen einsehen und abkassieren).
  * Der Verkäufer (KELLNER) kassiert seine eigenen Bestellungen zusätzlich über das
  * Benutzer-Recht `darfZahlen` – das wird pro Zahlung serverseitig geprüft.

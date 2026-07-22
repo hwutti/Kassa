@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, fehler, handleError } from "@/lib/api";
 import { verkaufbarWhere } from "@/lib/sichtbarkeit";
 import { requireRolle } from "@/lib/auth";
-import { darfKellner } from "@/lib/rollen";
+import { darfVerkaufen } from "@/lib/rollen";
 import { auditLog } from "@/lib/bestelllogik";
 import { ereignisSenden } from "@/lib/ereignisse";
 
@@ -26,7 +26,7 @@ const Schema = z.object({
  */
 export async function POST(req: Request) {
   try {
-    const session = await requireRolle(darfKellner);
+    const session = await requireRolle(darfVerkaufen);
     if (session instanceof Response) return session;
     // Direktverkauf nimmt Geld ein -> Kassenrecht nötig.
     const benutzer = await prisma.benutzer.findUnique({ where: { id: session.sub }, select: { darfZahlen: true } });

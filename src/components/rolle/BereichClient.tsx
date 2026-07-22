@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 import { RollenHeader } from "@/components/rolle/RollenHeader";
+import { DirektverkaufPanel } from "@/components/rolle/DirektverkaufPanel";
 import { useLive } from "@/lib/useLive";
 
 type Ticket = {
@@ -28,11 +29,15 @@ export function BereichClient() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
   const [geladen, setGeladen] = useState(false);
+  const [darfZahlen, setDarfZahlen] = useState(false);
+  // Umschaltbar: Ticket-Ausgabe (Vorbereitung/Abholung) ODER Direktverkauf am Tresen.
+  const [modus, setModus] = useState<"tickets" | "direkt">("tickets");
 
   const laden = useCallback(async () => {
     try {
-      const d = await jsonFetch<{ tickets: Ticket[] }>("/api/bereich/tickets");
+      const d = await jsonFetch<{ tickets: Ticket[]; darfZahlen?: boolean }>("/api/bereich/tickets");
       setTickets(d.tickets);
+      setDarfZahlen(d.darfZahlen === true);
       setFehler(null);
     } catch (e) {
       setFehler((e as Error).message);
@@ -68,9 +73,22 @@ export function BereichClient() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <RollenHeader titel="Bereich" benutzer={tickets[0]?.arbeitsbereich}>
-        <span className="badge bg-brand-600/20 text-brand-50">● Live</span>
+        {darfZahlen && (
+          <div className="flex gap-1">
+            <button className={`pill-tab ${modus === "tickets" ? "on" : ""}`} onClick={() => setModus("tickets")}>
+              Ausgabe
+            </button>
+            <button className={`pill-tab ${modus === "direkt" ? "on" : ""}`} onClick={() => setModus("direkt")}>
+              Direkt (Tresen)
+            </button>
+          </div>
+        )}
+        {modus === "tickets" && <span className="badge bg-brand-600/20 text-brand-50">● Live</span>}
       </RollenHeader>
 
+      {modus === "direkt" ? (
+        <DirektverkaufPanel />
+      ) : (
       <div className="flex-1 overflow-y-auto p-3">
         {fehler && <p className="text-red-300 text-sm mb-2">{fehler}</p>}
         {geladen && tickets.length === 0 && <p className="text-neutral-400">Keine offenen Tickets.</p>}
@@ -147,6 +165,7 @@ export function BereichClient() {
           })}
         </div>
       </div>
+      )}
     </div>
   );
 }
