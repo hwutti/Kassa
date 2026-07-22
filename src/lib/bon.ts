@@ -29,12 +29,10 @@ function escape(s: string): string {
  */
 export function druckeBon(d: BonDaten): void {
   const zeilen = d.positionen
-    .map(
-      (p) =>
-        `<tr><td class="q">${p.menge}×</td><td class="n">${escape(p.produktName)}` +
-        `<div class="ep">${formatCent(p.einzelpreisCent)}</div></td>` +
-        `<td class="r">${formatCent(p.summeCent)}</td></tr>`,
-    )
+    .map((p) => {
+      const proStk = p.menge > 1 ? `<div class="ep">à ${formatCent(p.einzelpreisCent)}</div>` : "";
+      return `<tr><td class="q">${p.menge}×</td><td class="n">${escape(p.produktName)}${proStk}</td><td class="r">${formatCent(p.summeCent)}</td></tr>`;
+    })
     .join("");
 
   const geld =
@@ -45,50 +43,58 @@ export function druckeBon(d: BonDaten): void {
           : "")
       : "";
 
-  const logo = d.logoUrl
-    ? `<div class="logo"><img src="${escape(d.logoUrl)}" alt=""></div>`
-    : "";
+  const logo = d.logoUrl ? `<div class="logo"><img src="${escape(d.logoUrl)}" alt=""></div>` : "";
   const untertitel = d.untertitel ? `<div class="sub">${escape(d.untertitel)}</div>` : "";
   const infoZeilen = [
-    d.tisch ? `Tisch/Nr.: ${escape(d.tisch)}` : "",
-    d.verkaeufer ? `Verkäufer: ${escape(d.verkaeufer)}` : "",
+    d.tisch ? `Tisch/Nr. ${escape(d.tisch)}` : "",
+    d.verkaeufer ? `Bedienung: ${escape(d.verkaeufer)}` : "",
   ]
     .filter(Boolean)
     .join(" · ");
+  const fuss = d.untertitel ? `<div class="small">${escape(d.untertitel)} · ${escape(d.datum)}</div>` : "";
 
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>Beleg ${d.nummer}</title>
 <style>
   @page { size: 80mm auto; margin: 3mm; }
   * { box-sizing: border-box; }
-  body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 12px; color: #000; margin: 0; width: 74mm; }
-  .logo { text-align: center; margin-bottom: 1.5mm; }
-  .logo img { max-height: 16mm; max-width: 62mm; object-fit: contain; }
-  h1 { font-size: 15px; text-align: center; margin: 0; font-weight: 700; }
-  .sub { text-align: center; font-size: 11px; margin-top: 0.5mm; }
-  .meta { text-align: center; font-size: 10px; color: #222; margin: 1.5mm 0; }
-  .hr { border-top: 1px dashed #000; margin: 2mm 0; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 12px; color: #111; margin: 0; width: 74mm; }
+  .logo { text-align: center; margin-bottom: 2mm; }
+  .logo img { max-height: 18mm; max-width: 58mm; object-fit: contain; }
+  h1 { font-size: 17px; text-align: center; margin: 0; font-weight: 800; letter-spacing: .2px; }
+  .sub { text-align: center; font-size: 11px; color: #333; margin-top: 1mm; }
+  .meta { text-align: center; font-size: 10px; color: #444; margin-top: 2mm; line-height: 1.55; }
+  .rule { border: 0; border-top: 1px solid #000; margin: 2.5mm 0; }
+  .rule.dash { border-top: 1px dashed #999; }
   table { width: 100%; border-collapse: collapse; }
-  td { vertical-align: top; padding: 0.6mm 0; font-size: 12px; }
-  td.q { white-space: nowrap; padding-right: 1.5mm; }
+  td { vertical-align: top; padding: 1mm 0; font-size: 12.5px; }
+  td.q { white-space: nowrap; padding-right: 2mm; font-weight: 700; }
   td.n { width: 100%; }
-  td.n .ep { font-size: 9px; color: #555; }
+  td.n .ep { font-size: 9px; color: #777; }
   td.r { text-align: right; white-space: nowrap; }
-  .row { display: flex; justify-content: space-between; font-size: 12px; padding: 0.3mm 0; }
-  .sum { font-weight: 700; font-size: 15px; margin-top: 1mm; }
-  .rueck { font-weight: 700; }
-  .foot { text-align: center; margin-top: 4mm; font-size: 11px; }
+  .sumbox { margin-top: 1mm; padding-top: 1.5mm; border-top: 2px solid #000; }
+  .row { display: flex; justify-content: space-between; padding: .4mm 0; font-size: 12px; }
+  .row.sum { font-weight: 800; font-size: 16px; }
+  .pay { margin-top: 1.5mm; color: #222; }
+  .row.rueck { font-weight: 800; font-size: 13px; }
+  .foot { text-align: center; margin-top: 5mm; }
+  .foot .thanks { font-weight: 700; font-size: 12px; }
+  .foot .small { color: #666; font-size: 9px; margin-top: 1mm; }
 </style></head><body>
   ${logo}
   <h1>${escape(d.titel)}</h1>
   ${untertitel}
-  <div class="meta">${escape(d.datum)} · Beleg-Nr. ${d.nummer}${infoZeilen ? "<br>" + infoZeilen : ""}</div>
-  <div class="hr"></div>
+  <div class="meta">${escape(d.datum)}<br>Beleg-Nr. ${d.nummer}${infoZeilen ? " · " + infoZeilen : ""}</div>
+  <hr class="rule">
   <table>${zeilen}</table>
-  <div class="hr"></div>
-  <div class="row sum"><span>Summe</span><span>${formatCent(d.summeCent)}</span></div>
-  <div class="row"><span>Zahlung</span><span>${ART_LABEL[d.art] ?? d.art}</span></div>
-  ${geld}
-  <div class="foot">Vielen Dank für Ihren Besuch!</div>
+  <div class="sumbox">
+    <div class="row sum"><span>Summe</span><span>${formatCent(d.summeCent)}</span></div>
+    <div class="pay">
+      <div class="row"><span>Zahlung</span><span>${ART_LABEL[d.art] ?? d.art}</span></div>
+      ${geld}
+    </div>
+  </div>
+  <hr class="rule dash">
+  <div class="foot"><div class="thanks">Vielen Dank für Ihren Besuch!</div>${fuss}</div>
   <script>
     (function () {
       function go() { try { window.focus(); window.print(); } catch (e) {} }
