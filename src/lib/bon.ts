@@ -95,37 +95,61 @@ export function druckeBon(d: BonDaten): void {
   </div>
   <hr class="rule dash">
   <div class="foot"><div class="thanks">Vielen Dank für Ihren Besuch!</div>${fuss}</div>
-  <script>
-    (function () {
-      function go() { try { window.focus(); window.print(); } catch (e) {} }
-      // window.onload wartet auf Bilder (Logo); Fallback nach 1,2 s.
-      if (document.readyState === "complete") setTimeout(go, 200);
-      else window.addEventListener("load", function () { setTimeout(go, 150); });
-      setTimeout(go, 1200);
-    })();
-  </script>
 </body></html>`;
 
+  // Robustes Drucken: der Druck wird vom Eltern-Fenster über das onload-Event
+  // ausgelöst – NICHT über ein Inline-Skript im iframe. So funktioniert der
+  // Beleg auch dann, wenn die App als installierte PWA läuft oder der Browser
+  // Skripte in dynamisch erzeugten iframes blockiert. srcdoc statt document.write,
+  // damit der Inhalt zuverlässig geparst und geladen wird.
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
-  iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
-  document.body.appendChild(iframe);
+  // Ausgeblendet, aber mit echter Größe und nur aus dem Sichtfeld geschoben –
+  // ein 0×0- oder display:none-iframe wird von manchen Browsern leer gedruckt.
+  iframe.style.cssText = "position:fixed;left:-10000px;top:0;width:80mm;height:auto;border:0;";
+  iframe.srcdoc = html;
 
-  const doc = iframe.contentWindow?.document;
-  if (!doc) {
-    iframe.remove();
-    return;
-  }
   let entfernt = false;
   const aufraeumen = () => {
     if (entfernt) return;
     entfernt = true;
-    setTimeout(() => iframe.remove(), 500);
+    setTimeout(() => iframe.remove(), 800);
   };
-  if (iframe.contentWindow) iframe.contentWindow.onafterprint = aufraeumen;
-  doc.open();
-  doc.write(html);
-  doc.close();
-  // Sicherheitsnetz: iframe spätestens nach 15 s entfernen.
-  setTimeout(aufraeumen, 15000);
+
+  iframe.addEventListener("load", () => {
+    const win = iframe.contentWindow;
+    if (!win) {
+      aufraeumen();
+      return;
+    }
+    win.onafterprint = aufraeumen;
+    const drucken = () => {
+      try {
+        win.focus();
+        win.print();
+      } catch {
+        aufraeumen();
+      }
+    };
+    // Vor dem Druck auf das Laden der Bilder (Logo) warten – sonst fehlt es.
+    const bilder = Array.from(win.document.images ?? []);
+    const offen = bilder.filter((b) => !b.complete);
+    if (offen.length === 0) {
+      setTimeout(drucken, 60);
+    } else {
+      let rest = offen.length;
+      const eins = () => {
+        if (--rest <= 0) drucken();
+      };
+      offen.forEach((b) => {
+        b.addEventListener("load", eins);
+        b.addEventListener("error", eins);
+      });
+      setTimeout(drucken, 1500); // Fallback, falls ein Bild hängt
+    }
+  });
+
+  document.body.appendChild(iframe);
+  // Sicherheitsnetz: iframe spätestens nach 20 s entfernen.
+  setTimeout(aufraeumen, 20000);
 }
