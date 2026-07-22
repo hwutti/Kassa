@@ -136,11 +136,9 @@ export function ZahlModal({
             <button className="btn-primary flex-1" onClick={bezahlen} disabled={laedt || zuWenig}>
               {laedt
                 ? "Speichere …"
-                : art !== "BAR"
-                  ? "Bezahlt"
-                  : erhaltenText.trim() === ""
-                    ? "Bezahlt (passend)"
-                    : "Bezahlt"}
+                : art === "BAR" && erhaltenText.trim() === ""
+                  ? "Bezahlen (passend)"
+                  : "Bezahlen"}
             </button>
           </div>
         </div>
