@@ -51,7 +51,7 @@ export function druckeBon(d: BonDaten): void {
   ]
     .filter(Boolean)
     .join(" · ");
-  const fuss = d.untertitel ? `<div class="small">${escape(d.untertitel)} · ${escape(d.datum)}</div>` : "";
+  const fuss = d.untertitel ? `<div class="small">${escape(d.untertitel)}</div>` : "";
 
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>Beleg ${d.nummer}</title>
 <style>
@@ -59,12 +59,12 @@ export function druckeBon(d: BonDaten): void {
   * { box-sizing: border-box; }
   body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 12px; color: #111; margin: 0; width: 74mm; }
   .logo { text-align: center; margin-bottom: 2mm; }
-  .logo img { max-height: 18mm; max-width: 58mm; object-fit: contain; }
+  .logo img { max-height: 14mm; max-width: 48mm; object-fit: contain; }
   h1 { font-size: 17px; text-align: center; margin: 0; font-weight: 800; letter-spacing: .2px; }
   .sub { text-align: center; font-size: 11px; color: #333; margin-top: 1mm; }
   .meta { text-align: center; font-size: 10px; color: #444; margin-top: 2mm; line-height: 1.55; }
   .rule { border: 0; border-top: 1px solid #000; margin: 2.5mm 0; }
-  .rule.dash { border-top: 1px dashed #999; }
+  .rule.dash { border-top: 1px dashed #000; }
   table { width: 100%; border-collapse: collapse; }
   td { vertical-align: top; padding: 1mm 0; font-size: 12.5px; }
   td.q { white-space: nowrap; padding-right: 2mm; font-weight: 700; }
@@ -83,7 +83,7 @@ export function druckeBon(d: BonDaten): void {
   ${logo}
   <h1>${escape(d.titel)}</h1>
   ${untertitel}
-  <div class="meta">${escape(d.datum)}<br>Beleg-Nr. ${d.nummer}${infoZeilen ? " · " + infoZeilen : ""}</div>
+  <div class="meta">${escape(d.datum)}<br>Beleg-Nr. ${d.nummer}${infoZeilen ? "<br>" + infoZeilen : ""}</div>
   <hr class="rule">
   <table>${zeilen}</table>
   <div class="sumbox">
