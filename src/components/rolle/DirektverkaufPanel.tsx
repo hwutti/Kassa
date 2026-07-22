@@ -36,6 +36,9 @@ export function DirektverkaufPanel() {
   const [laedt, setLaedt] = useState(false);
   const [zahlFehler, setZahlFehler] = useState<string | null>(null);
   const [sumupKey, setSumupKey] = useState<string | null>(null);
+  const [bonAutoDruck, setBonAutoDruck] = useState(false);
+  // Nach dem Kassieren: Bestätigung/Übersicht mit bewusstem „Bon drucken" (kein Auto-Druck).
+  const [bonDaten, setBonDaten] = useState<BonDaten | null>(null);
   const [konfig, setKonfig] = useState<{ titel: string; untertitel: string | null; logoUrl: string | null }>({
     titel: "Kirchtag",
     untertitel: null,
@@ -49,8 +52,11 @@ export function DirektverkaufPanel() {
         setProdukte(d.produkte);
       })
       .catch((e) => setFehler((e as Error).message));
-    jsonFetch<{ sumupAffiliateKey: string | null }>("/api/kasse/konfig")
-      .then((k) => setSumupKey(k.sumupAffiliateKey))
+    jsonFetch<{ sumupAffiliateKey: string | null; bonAutoDruck: boolean }>("/api/kasse/konfig")
+      .then((k) => {
+        setSumupKey(k.sumupAffiliateKey);
+        setBonAutoDruck(k.bonAutoDruck);
+      })
       .catch(() => undefined);
     jsonFetch<{ titel?: string; untertitel?: string | null; logoUrl?: string | null; aktiveVeranstaltung?: { name: string } | null }>(
       "/api/konfiguration",
@@ -125,7 +131,9 @@ export function DirektverkaufPanel() {
         gegebenCent: best.erhaltenCent,
         rueckgeldCent: best.rueckgeldCent,
       };
-      druckeBon(bon);
+      // Übersicht/Bestätigung zeigen; Druck nur automatisch, wenn so eingestellt.
+      setBonDaten(bon);
+      if (bonAutoDruck) druckeBon(bon);
       clientRef.current = uuid();
       setKorb({});
       setNotiz("");
@@ -278,6 +286,31 @@ export function DirektverkaufPanel() {
           onAbbrechen={() => setOffen(false)}
           onBezahlen={bezahlen}
         />
+      )}
+
+      {bonDaten && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="card w-full max-w-xs p-5 space-y-4 text-center">
+            <div className="mx-auto h-12 w-12 rounded-full flex items-center justify-center text-2xl bg-brand-600/20 text-brand-50">
+              ✓
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">Zahlung erfasst</h2>
+              <p className="text-sm text-neutral-400">
+                Nr. {bonDaten.nummer} · {formatCent(bonDaten.summeCent)}
+                {bonDaten.rueckgeldCent !== null ? ` · Rückgeld ${formatCent(bonDaten.rueckgeldCent)}` : ""}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button className="btn-ghost flex-1" onClick={() => setBonDaten(null)}>
+                Fertig
+              </button>
+              <button className="btn-primary flex-1" onClick={() => druckeBon(bonDaten)}>
+                Bon drucken
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
