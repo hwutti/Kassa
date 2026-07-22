@@ -55,6 +55,7 @@ export function AufbauAdmin() {
   const [ansicht, setAnsicht] = useState<"plan" | "liste">("plan");
   const [zugaengeOffen, setZugaengeOffen] = useState(false);
   const [pins, setPins] = useState<Record<string, string>>({}); // in dieser Sitzung erzeugte Klartext-PINs
+  const [konfig, setKonfig] = useState<{ titel: string; veranstaltung: string | null }>({ titel: "Zugänge", veranstaltung: null });
 
   const laden = useCallback(async () => {
     try {
@@ -74,6 +75,12 @@ export function AufbauAdmin() {
   useEffect(() => {
     laden();
   }, [laden]);
+
+  useEffect(() => {
+    jsonFetch<{ titel?: string; aktiveVeranstaltung?: { name: string } | null }>("/api/konfiguration")
+      .then((k) => setKonfig({ titel: k.titel || "Zugänge", veranstaltung: k.aktiveVeranstaltung?.name ?? null }))
+      .catch(() => undefined);
+  }, []);
 
   const kellner = useMemo(() => benutzer.filter((b) => b.rolle === "KELLNER"), [benutzer]);
   const kassa = useMemo(() => benutzer.filter((b) => b.rolle === "KASSA"), [benutzer]);
@@ -263,44 +270,75 @@ export function AufbauAdmin() {
     }
   }
 
-  function druckeZugaenge() {
-    const zeilen = benutzer
-      .filter((b) => b.aktiv)
-      .map((b) => {
+  async function pdfZugaenge() {
+    setFehler(null);
+    // Neues Tab SOFORT (im Klick) öffnen, sonst blockiert der Popup-Schutz nach dem await.
+    const tab = window.open("", "_blank");
+    try {
+      const { jsPDF } = await import("jspdf");
+      const QRCode = (await import("qrcode")).default;
+      const doc = new jsPDF({ unit: "mm", format: "a4" });
+      const seiteB = 210, mx = 16;
+      const url = `${window.location.origin}/admin/login`;
+
+      // Kopf
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text(konfig.titel || "Zugänge", mx, 20);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const sub = [konfig.veranstaltung, `Stand: ${new Date().toLocaleDateString("de-AT")}`].filter(Boolean).join("  ·  ");
+      doc.text(sub, mx, 26);
+      doc.text(`Anmeldung am Tablet: ${url}`, mx, 31);
+      // QR oben rechts
+      try {
+        const qr = await QRCode.toDataURL(url, { margin: 1, width: 200 });
+        doc.addImage(qr, "PNG", seiteB - mx - 26, 12, 26, 26);
+      } catch {
+        /* QR optional */
+      }
+
+      // Tabellenkopf
+      let y = 44;
+      const cx = [mx, mx + 58, mx + 100, mx + 150];
+      doc.setFont("helvetica", "bold");
+      doc.text("Bezeichnung", cx[0], y);
+      doc.text("Funktion", cx[1], y);
+      doc.text("Login", cx[2], y);
+      doc.text("PIN", cx[3], y);
+      y += 2;
+      doc.setDrawColor(170);
+      doc.line(mx, y, seiteB - mx, y);
+      y += 5;
+      doc.setFont("helvetica", "normal");
+
+      for (const b of benutzer.filter((x) => x.aktiv)) {
+        if (y > 285) {
+          doc.addPage();
+          y = 20;
+        }
         const pin = pins[b.id] ? pins[b.id] : b.hatPin ? "(gesetzt)" : "—";
-        const rolle = ROLLEN_LABEL[b.rolle as Rolle] ?? b.rolle;
-        return `<tr><td>${b.anzeigename || b.benutzername}</td><td>${rolle}</td><td>${b.benutzername}</td><td class="pin">${pin}</td></tr>`;
-      })
-      .join("");
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Zugaenge-Kirchtag</title>
-<style>
-  @page{size:A4;margin:16mm;}
-  body{font-family:Arial,sans-serif;color:#000;margin:0;}
-  h1{font-size:18px;margin:0 0 4px;} .sub{color:#555;font-size:12px;margin-bottom:12px;}
-  table{width:100%;border-collapse:collapse;font-size:13px;}
-  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #ccc;}
-  th{background:#f0f0f0;} td.pin{font-family:monospace;font-weight:bold;font-size:15px;}
-  tr{page-break-inside:avoid;}
-</style></head><body>
-  <h1>Zugänge – Anmeldung am Tablet</h1>
-  <div class="sub">PIN am Anmelde-Bildschirm eingeben. „(gesetzt)" = PIN vorhanden, aber aus Sicherheitsgründen nicht anzeigbar – bei Bedarf neu erzeugen.</div>
-  <table><thead><tr><th>Bezeichnung</th><th>Funktion</th><th>Login</th><th>PIN</th></tr></thead><tbody>${zeilen}</tbody></table>
-  <script>window.addEventListener("load",function(){setTimeout(function(){window.print()},150)});setTimeout(function(){window.print()},1000);</script>
-</body></html>`;
-    const iframe = document.createElement("iframe");
-    iframe.setAttribute("aria-hidden", "true");
-    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
-    document.body.appendChild(iframe);
-    const doc = iframe.contentWindow?.document;
-    if (!doc) {
-      iframe.remove();
-      return;
+        doc.text((b.anzeigename || b.benutzername).slice(0, 28), cx[0], y);
+        doc.text((ROLLEN_LABEL[b.rolle as Rolle] ?? b.rolle).slice(0, 20), cx[1], y);
+        doc.text("@" + b.benutzername, cx[2], y);
+        doc.setFont("courier", pins[b.id] ? "bold" : "normal");
+        doc.setFontSize(pins[b.id] ? 12 : 10);
+        doc.text(pin, cx[3], y);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        y += 7;
+      }
+      doc.setFontSize(8);
+      doc.setTextColor(120);
+      doc.text('„(gesetzt)" = PIN vorhanden, aber aus Sicherheitsgründen nicht anzeigbar – bei Bedarf neu erzeugen.', mx, 292);
+
+      const blobUrl = doc.output("bloburl") as unknown as string;
+      if (tab) tab.location.href = blobUrl;
+      else window.open(blobUrl, "_blank");
+    } catch (e) {
+      tab?.close();
+      setFehler("PDF konnte nicht erzeugt werden: " + (e as Error).message);
     }
-    if (iframe.contentWindow) iframe.contentWindow.onafterprint = () => setTimeout(() => iframe.remove(), 500);
-    doc.open();
-    doc.write(html);
-    doc.close();
-    setTimeout(() => iframe.remove(), 15000);
   }
 
   return (
@@ -456,7 +494,7 @@ export function AufbauAdmin() {
           fehler={fehler}
           onPin={pinErzeugen}
           onAllePins={alleFehlendenPins}
-          onDrucken={druckeZugaenge}
+          onDrucken={pdfZugaenge}
           onSchliessen={() => {
             setZugaengeOffen(false);
             setFehler(null);
@@ -541,7 +579,7 @@ function ZugaengeListe({
             PINs für alle ohne PIN erzeugen
           </button>
           <button className="btn-ghost" onClick={onDrucken}>
-            📄 Als PDF / Drucken
+            📄 PDF öffnen
           </button>
           <button className="btn-primary ml-auto" onClick={onSchliessen}>
             Schließen
