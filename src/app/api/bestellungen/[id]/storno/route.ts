@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, fehler, handleError } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { verifyPasswort } from "@/lib/passwort";
+import { auditLog } from "@/lib/bestelllogik";
 import { ereignisSenden } from "@/lib/ereignisse";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +62,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       where: { id },
       select: { id: true, nummer: true, status: true },
     });
+    await auditLog({ bestellungId: id, benutzerName: storniertVon, typ: "STORNIERT", neuerWert: "STORNIERT", grund });
     ereignisSenden("storno");
     return ok(aktualisiert);
   } catch (e) {
