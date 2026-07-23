@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ok, handleError } from "@/lib/api";
-import { verkaufbarWhere } from "@/lib/sichtbarkeit";
+import { anzeigeWhere } from "@/lib/sichtbarkeit";
 import { requireRolle } from "@/lib/auth";
 import { darfVerkaufen } from "@/lib/rollen";
 
@@ -14,7 +14,7 @@ export async function GET() {
     if (session instanceof Response) return session;
 
     const produkteRaw = await prisma.produkt.findMany({
-      where: verkaufbarWhere(),
+      where: anzeigeWhere(),
       orderBy: [{ sortierung: "asc" }, { name: "asc" }],
       select: {
         id: true,
@@ -23,6 +23,7 @@ export async function GET() {
         icon: true,
         bildUrl: true,
         barcode: true,
+        ausverkauft: true,
         kategorieId: true,
         kategorie: { select: { id: true, name: true, farbe: true, icon: true, sortierung: true } },
         arbeitsbereiche: { select: { arbeitsbereichId: true, primaer: true } },
@@ -36,6 +37,7 @@ export async function GET() {
       icon: p.icon,
       bildUrl: p.bildUrl,
       barcode: p.barcode,
+      ausverkauft: p.ausverkauft,
       kategorieId: p.kategorieId,
     }));
 

@@ -23,6 +23,7 @@ export function sichtbarkeitWhere(bereich: {
   const basis: Prisma.ProduktWhereInput = {
     aktiv: true, // (1)
     archiviert: false,
+    ausverkauft: false, // (6) ausverkaufte Produkte sind nicht bestellbar
     preisCent: { gte: 0 }, // (5) gte 0 schließt NULL automatisch aus
     kategorie: { aktiv: true }, // (2)
   };
@@ -52,6 +53,21 @@ export function sichtbarkeitWhere(bereich: {
  * inaktive Kategorie) bleiben serverseitig verbindlich.
  */
 export function verkaufbarWhere(): Prisma.ProduktWhereInput {
+  return {
+    aktiv: true,
+    archiviert: false,
+    ausverkauft: false, // ausverkauft = nicht verkäuflich (serverseitig verbindlich)
+    preisCent: { gte: 0 },
+    kategorie: { aktiv: true },
+  };
+}
+
+/**
+ * Wie verkaufbarWhere, aber OHNE die Ausverkauft-Sperre: für die ANZEIGE im
+ * Verkauf, damit ausverkaufte Produkte ausgegraut sichtbar bleiben (nicht
+ * bestellbar – das Bestellen wird über verkaufbarWhere weiterhin abgelehnt).
+ */
+export function anzeigeWhere(): Prisma.ProduktWhereInput {
   return {
     aktiv: true,
     archiviert: false,

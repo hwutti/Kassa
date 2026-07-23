@@ -5,6 +5,7 @@ import { jsonFetch } from "@/lib/client";
 import { RollenHeader } from "@/components/rolle/RollenHeader";
 import { DirektverkaufPanel } from "@/components/rolle/DirektverkaufPanel";
 import { LiveBadge } from "@/components/ui/Badge";
+import { Modal } from "@/components/ui/Modal";
 import { useLive } from "@/lib/useLive";
 
 type Ticket = {
@@ -33,6 +34,8 @@ type Position = {
   icon: string | null;
 };
 
+type BereichProdukt = { id: string; name: string; icon: string | null; bildUrl: string | null; ausverkauft: boolean; kategorieName: string };
+
 function minuten(iso: string): number {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
 }
@@ -59,6 +62,10 @@ export function BereichClient() {
   const [darfZahlen, setDarfZahlen] = useState(false);
   // Umschaltbar: Ticket-Ausgabe (Vorbereitung/Abholung) ODER Direktverkauf am Tresen.
   const [modus, setModus] = useState<"tickets" | "direkt">("tickets");
+  // Ausverkauft-Verwaltung (Produkte des eigenen Bereichs schnell umschalten).
+  const [ausverkauftOffen, setAusverkauftOffen] = useState(false);
+  const [produkte, setProdukte] = useState<BereichProdukt[]>([]);
+  const [produkteLaden, setProdukteLaden] = useState(false);
 
   const laden = useCallback(async () => {
     try {
@@ -106,6 +113,32 @@ export function BereichClient() {
     }
   }
 
+  async function ladeProdukte() {
+    setProdukteLaden(true);
+    try {
+      const d = await jsonFetch<{ produkte: BereichProdukt[] }>("/api/bereich/produkte");
+      setProdukte(d.produkte);
+    } catch (e) {
+      setFehler((e as Error).message);
+    } finally {
+      setProdukteLaden(false);
+    }
+  }
+  function oeffneAusverkauft() {
+    setAusverkauftOffen(true);
+    ladeProdukte();
+  }
+  async function ausverkauftUmschalten(p: BereichProdukt) {
+    const neu = !p.ausverkauft;
+    setProdukte((ps) => ps.map((x) => (x.id === p.id ? { ...x, ausverkauft: neu } : x)));
+    try {
+      await jsonFetch("/api/bereich/produkte", { method: "POST", body: JSON.stringify({ produktId: p.id, ausverkauft: neu }) });
+    } catch (e) {
+      setFehler((e as Error).message);
+      ladeProdukte();
+    }
+  }
+
   const spalten: { titel: string; farbe: string; filter: (s: string) => boolean }[] = [
     { titel: "Neu", farbe: "border-neutral-600", filter: (s) => s === "QUEUED" },
     { titel: "In Vorbereitung", farbe: "border-blue-500", filter: (s) => s === "ACCEPTED" || s === "IN_PREPARATION" },
@@ -125,6 +158,9 @@ export function BereichClient() {
             </button>
           </div>
         )}
+        <button className="btn-ghost py-1.5 text-sm" onClick={oeffneAusverkauft}>
+          🚫 Ausverkauft
+        </button>
         {modus === "tickets" && <LiveBadge />}
       </RollenHeader>
 
@@ -253,6 +289,56 @@ export function BereichClient() {
           })}
         </div>
       </div>
+      )}
+
+      {ausverkauftOffen && (
+        <Modal onSchliessen={() => setAusverkauftOffen(false)} cardClass="w-full max-w-lg max-h-[90dvh] flex flex-col p-5">
+          <div className="flex items-center gap-2 mb-1 shrink-0">
+            <h2 className="text-lg font-semibold">🚫 Ausverkauft verwalten</h2>
+            <span className="ml-auto text-xs text-neutral-500">tippen zum Umschalten</span>
+          </div>
+          <p className="text-sm text-neutral-400 mb-3 shrink-0">
+            Ausverkaufte Produkte können nicht mehr bestellt werden und erscheinen im Verkauf ausgegraut.
+          </p>
+          <div className="flex-1 overflow-y-auto -mx-1 px-1 space-y-1">
+            {produkteLaden && <p className="text-neutral-400">Lädt …</p>}
+            {!produkteLaden && produkte.length === 0 && <p className="text-neutral-400">Keine Produkte für diesen Bereich.</p>}
+            {produkte.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => ausverkauftUmschalten(p)}
+                className={`w-full flex items-center gap-3 rounded-lg p-2 text-left border ${
+                  p.ausverkauft ? "border-red-500/60 bg-red-950/30" : "border-neutral-800 hover:border-neutral-600"
+                }`}
+              >
+                <span className="h-10 w-10 shrink-0 rounded bg-neutral-800 flex items-center justify-center overflow-hidden">
+                  {p.bildUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.bildUrl} alt="" className={`h-full w-full object-cover ${p.ausverkauft ? "grayscale" : ""}`} />
+                  ) : (
+                    <span className="text-xl">{p.icon || "🍽️"}</span>
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className={`font-medium ${p.ausverkauft ? "line-through text-neutral-400" : ""}`}>{p.name}</span>
+                  <span className="block text-xs text-neutral-500">{p.kategorieName}</span>
+                </span>
+                <span
+                  className={`shrink-0 text-xs font-semibold rounded-full px-2.5 py-1 ${
+                    p.ausverkauft ? "bg-red-600 text-white" : "bg-emerald-600 text-white"
+                  }`}
+                >
+                  {p.ausverkauft ? "Ausverkauft" : "Verfügbar"}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="shrink-0 pt-3">
+            <button className="btn-primary w-full" onClick={() => setAusverkauftOffen(false)}>
+              Fertig
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );

@@ -52,6 +52,7 @@ model Produkt {
   preisCent       Int? // NULL = kein gültiger Preis hinterlegt
   aktiv           Boolean  @default(true)
   archiviert      Boolean  @default(false) // verkaufte Produkte werden archiviert statt gelöscht
+  ausverkauft     Boolean  @default(false) // temporär nicht verfügbar (im Bereich schnell umschaltbar)
   sortierung      Int      @default(0)
   bildUrl         String?
   icon            String? // Emoji als einfache, lizenzfreie Darstellung

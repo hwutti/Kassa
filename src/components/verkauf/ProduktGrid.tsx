@@ -11,6 +11,7 @@ export type Prod = {
   icon: string | null;
   bildUrl: string | null;
   barcode: string | null;
+  ausverkauft?: boolean;
   kategorieId: string;
 };
 export type Pos = { produktId: string; name: string; preisCent: number; menge: number };
@@ -60,7 +61,7 @@ export function ProduktGrid({
             if (!code) return;
             // Barcode-Scanner tippt den Code + Enter: exakter Treffer -> in den Korb.
             const treffer = produkte.find((p) => p.barcode && p.barcode === code);
-            if (treffer) {
+            if (treffer && !treffer.ausverkauft) {
               onPlus(treffer);
               setSuche("");
             }
@@ -82,17 +83,28 @@ export function ProduktGrid({
           {gefiltert.map((p) => (
             <div
               key={p.id}
-              className={`card p-0 overflow-hidden flex flex-col ${korb[p.id] ? "ring-2 ring-brand-600 border-brand-600" : ""}`}
+              className={`card p-0 overflow-hidden flex flex-col ${
+                p.ausverkauft ? "opacity-60" : korb[p.id] ? "ring-2 ring-brand-600 border-brand-600" : ""
+              }`}
             >
-              <button onClick={() => onPlus(p)} className="text-left active:scale-[.98] transition">
+              <button
+                onClick={() => !p.ausverkauft && onPlus(p)}
+                disabled={p.ausverkauft}
+                className="text-left active:scale-[.98] transition disabled:active:scale-100"
+              >
                 <div className="relative aspect-[4/3] bg-neutral-800 flex items-center justify-center">
                   {p.bildUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.bildUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                    <img src={p.bildUrl} alt="" className={`absolute inset-0 h-full w-full object-cover ${p.ausverkauft ? "grayscale" : ""}`} />
                   ) : (
                     <span className="text-4xl leading-none">{p.icon || "🍽️"}</span>
                   )}
-                  {korb[p.id] && (
+                  {p.ausverkauft && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <span className="badge bg-red-600 text-white shadow">Ausverkauft</span>
+                    </span>
+                  )}
+                  {!p.ausverkauft && korb[p.id] && (
                     <span className="absolute top-1 right-1 badge bg-brand-600 text-white shadow">{korb[p.id].menge}×</span>
                   )}
                 </div>
@@ -104,7 +116,7 @@ export function ProduktGrid({
               <div className="mt-auto flex items-center gap-1 p-1.5 border-t border-neutral-800">
                 <button
                   onClick={() => onMenge(p.id, -1)}
-                  disabled={!korb[p.id]}
+                  disabled={p.ausverkauft || !korb[p.id]}
                   aria-label={`${p.name}: Menge verringern`}
                   className="h-10 flex-1 rounded-lg bg-neutral-800 text-xl font-semibold active:bg-neutral-700 disabled:opacity-30"
                 >
@@ -114,9 +126,10 @@ export function ProduktGrid({
                   {korb[p.id]?.menge ?? 0}
                 </span>
                 <button
-                  onClick={() => onPlus(p)}
+                  onClick={() => !p.ausverkauft && onPlus(p)}
+                  disabled={p.ausverkauft}
                   aria-label={`${p.name}: Menge erhöhen`}
-                  className="h-10 flex-1 rounded-lg bg-brand-600 text-white text-xl font-semibold active:bg-brand-700"
+                  className="h-10 flex-1 rounded-lg bg-brand-600 text-white text-xl font-semibold active:bg-brand-700 disabled:opacity-30"
                 >
                   +
                 </button>
