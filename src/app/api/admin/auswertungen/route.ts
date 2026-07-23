@@ -29,7 +29,8 @@ export async function GET(req: Request) {
     if (veranstaltungId) zeitraum.veranstaltungId = veranstaltungId;
 
     const abgeschlossen = await prisma.bestellung.findMany({
-      where: { ...zeitraum, status: "ABGESCHLOSSEN" },
+      // Erstattete Bestellungen zählen nicht zum Umsatz und fallen aus allen Auswertungen.
+      where: { ...zeitraum, status: "ABGESCHLOSSEN", zahlungStatus: { not: "REFUNDED" } },
       include: {
         positionen: true,
         verkaufsbereich: { select: { name: true } },
@@ -40,6 +41,12 @@ export async function GET(req: Request) {
     const anzahlStorniert = await prisma.bestellung.count({
       where: { ...zeitraum, status: "STORNIERT" },
     });
+    const erstattet = await prisma.bestellung.findMany({
+      where: { ...zeitraum, zahlungStatus: "REFUNDED" },
+      select: { summeCent: true },
+    });
+    const erstattetCent = erstattet.reduce((s, b) => s + b.summeCent, 0);
+    const anzahlErstattet = erstattet.length;
 
     const gesamtumsatzCent = abgeschlossen.reduce((s, b) => s + b.summeCent, 0);
     const anzahlBestellungen = abgeschlossen.length;
@@ -49,7 +56,7 @@ export async function GET(req: Request) {
     const heute = new Date();
     heute.setHours(0, 0, 0, 0);
     const heutigeBestellungen = await prisma.bestellung.findMany({
-      where: { status: "ABGESCHLOSSEN", createdAt: { gte: heute } },
+      where: { status: "ABGESCHLOSSEN", zahlungStatus: { not: "REFUNDED" }, createdAt: { gte: heute } },
       select: { summeCent: true },
     });
     const tagesumsatzCent = heutigeBestellungen.reduce((s, b) => s + b.summeCent, 0);
@@ -108,6 +115,8 @@ export async function GET(req: Request) {
         tagesumsatzCent,
         durchschnittCent,
         anzahlStorniert,
+        erstattetCent,
+        anzahlErstattet,
         zubereitungMinDurchschnitt,
         jeVerkaufsbereich: sortMap(jeBereich),
         jeKategorie: sortMap(jeKategorie),

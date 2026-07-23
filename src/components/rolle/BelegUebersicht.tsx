@@ -15,6 +15,7 @@ export type Beleg = {
   art: string;
   gegebenCent: number | null;
   rueckgeldCent: number | null;
+  gutscheinCode?: string | null;
 };
 
 export function BelegUebersicht({

@@ -13,6 +13,7 @@ const NAV = [
   { href: "/admin/arbeitsbereiche", label: "Arbeitsbereiche" },
   { href: "/admin/veranstaltungen", label: "Veranstaltungen" },
   { href: "/admin/bestellungen", label: "Bestellungen" },
+  { href: "/admin/gutscheine", label: "Gutscheine" },
   { href: "/admin/auswertungen", label: "Auswertungen" },
   { href: "/admin/audit", label: "Protokoll" },
   { href: "/admin/aufbau", label: "Aufbau" },

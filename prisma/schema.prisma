@@ -337,6 +337,22 @@ model Zahlung {
   @@index([bestellungId])
 }
 
+/// Gutschein/Wertkarte mit Restguthaben. Beträge in Cent. Beim Bezahlen mit
+/// Zahlungsart GUTSCHEIN wird das Restguthaben verringert.
+model Gutschein {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  anfangsCent Int // ausgegebenes Anfangsguthaben
+  restCent    Int // aktuelles Restguthaben
+  aktiv       Boolean  @default(true)
+  notiz       String?
+  erstelltVon String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([code])
+}
+
 /// Nachvollziehbares Audit-Protokoll wichtiger Aktionen.
 model AuditEreignis {
   id           String   @id @default(cuid())

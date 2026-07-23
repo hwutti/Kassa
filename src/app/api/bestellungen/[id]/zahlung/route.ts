@@ -4,12 +4,14 @@ import { ok, fehler, handleError } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { bestellungNeuBerechnen, auditLog } from "@/lib/bestelllogik";
 import { ereignisSenden } from "@/lib/ereignisse";
+import { gutscheinEinloesen, normalisiereCode } from "@/lib/gutschein";
 
 export const dynamic = "force-dynamic";
 
 const Schema = z.object({
   gegebenCent: z.number().int().min(0).nullable().optional(),
   art: z.enum(["BAR", "KARTE", "GUTSCHEIN"]).optional(),
+  gutscheinCode: z.string().trim().max(40).nullable().optional(),
 });
 
 /** POST /api/bestellungen/[id]/zahlung – Barzahlung erfassen (getrennt von Auslieferung). */
@@ -23,7 +25,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!darf) return fehler("Keine Berechtigung, Zahlungen zu erfassen.", 403);
 
     const { id } = await params;
-    const { gegebenCent, art = "BAR" } = Schema.parse(await req.json());
+    const { gegebenCent, art = "BAR", gutscheinCode } = Schema.parse(await req.json());
 
     const b = await prisma.bestellung.findUnique({
       where: { id },
@@ -52,6 +54,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           data: { zahlungStatus: "PAID", zahlungsart: art, erhaltenCent, rueckgeldCent, version: { increment: 1 } },
         });
         if (upd.count === 0) throw new Error("KONFLIKT");
+        // Gutschein einlösen (Restguthaben atomar verringern), falls Code angegeben.
+        if (art === "GUTSCHEIN" && gutscheinCode) {
+          const gs = await tx.gutschein.findUnique({ where: { code: normalisiereCode(gutscheinCode) } });
+          if (!gs) throw new Error("GS_404");
+          const r = gutscheinEinloesen(gs, b.summeCent);
+          if (!r.ok) throw new Error("GS:" + r.grund);
+          await tx.gutschein.update({ where: { id: gs.id }, data: { restCent: r.neuerRest } });
+        }
         await tx.zahlung.create({
           data: {
             bestellungId: id,
@@ -65,8 +75,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         });
       });
     } catch (e) {
-      if (e instanceof Error && e.message === "KONFLIKT")
-        return fehler("Bestellung wurde zwischenzeitlich geändert (bereits bezahlt oder storniert).", 409);
+      if (e instanceof Error) {
+        if (e.message === "KONFLIKT")
+          return fehler("Bestellung wurde zwischenzeitlich geändert (bereits bezahlt oder storniert).", 409);
+        if (e.message === "GS_404") return fehler("Gutschein nicht gefunden.", 404);
+        if (e.message.startsWith("GS:")) return fehler(e.message.slice(3), 400);
+      }
       throw e;
     }
 

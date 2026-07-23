@@ -7,6 +7,7 @@ import { requireRolle } from "@/lib/auth";
 import { darfVerkaufen } from "@/lib/rollen";
 import { auditLog } from "@/lib/bestelllogik";
 import { ereignisSenden } from "@/lib/ereignisse";
+import { gutscheinEinloesen, normalisiereCode } from "@/lib/gutschein";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -16,6 +17,7 @@ const Schema = z.object({
   positionen: z.array(z.object({ produktId: z.string().min(1), menge: z.number().int().positive().max(999) })).min(1).max(200),
   gegebenCent: z.number().int().min(0).nullable().optional(),
   art: z.enum(["BAR", "KARTE", "GUTSCHEIN"]).optional(),
+  gutscheinCode: z.string().trim().max(40).nullable().optional(),
 });
 
 /**
@@ -118,12 +120,24 @@ export async function POST(req: Request) {
             benutzerId: session.sub,
           },
         });
+        // Gutschein einlösen, falls Code angegeben.
+        if (art === "GUTSCHEIN" && daten.gutscheinCode) {
+          const gs = await tx.gutschein.findUnique({ where: { code: normalisiereCode(daten.gutscheinCode) } });
+          if (!gs) throw new Error("GS_404");
+          const r = gutscheinEinloesen(gs, summeCent);
+          if (!r.ok) throw new Error("GS:" + r.grund);
+          await tx.gutschein.update({ where: { id: gs.id }, data: { restCent: r.neuerRest } });
+        }
         return best;
       });
       await auditLog({ bestellungId: erstellt.id, benutzerId: session.sub, benutzerName: session.name, typ: "DIREKTVERKAUF", neuerWert: `Nr. ${erstellt.nummer}` });
       ereignisSenden("direktverkauf");
       return ok({ bestellung: serialize(erstellt), doppelt: false }, { status: 201 });
     } catch (e) {
+      if (e instanceof Error) {
+        if (e.message === "GS_404") return fehler("Gutschein nicht gefunden.", 404);
+        if (e.message.startsWith("GS:")) return fehler(e.message.slice(3), 400);
+      }
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
         const b = await prisma.bestellung.findUnique({ where: { clientRef: daten.clientRef }, include: { positionen: true } });
         if (b) return ok({ bestellung: serialize(b), doppelt: true });

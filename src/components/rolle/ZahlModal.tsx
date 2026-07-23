@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { formatCent, parseEuroToCent } from "@/lib/money";
 import { Geldrechner } from "@/components/kasse/Geldrechner";
+import { jsonFetch } from "@/lib/client";
 
 type Position = { produktName: string; menge: number; einzelpreisCent: number; summeCent: number };
 export type Zahlungsart = "BAR" | "KARTE" | "GUTSCHEIN";
@@ -38,16 +39,34 @@ export function ZahlModal({
   fehler: string | null;
   sumupAffiliateKey?: string | null;
   onAbbrechen: () => void;
-  onBezahlen: (gegebenCent: number | null, art: Zahlungsart) => void;
+  onBezahlen: (gegebenCent: number | null, art: Zahlungsart, gutscheinCode?: string | null) => void;
 }) {
   const [art, setArt] = useState<Zahlungsart>("BAR");
   const [erhaltenText, setErhaltenText] = useState("");
+  const [gutscheinCode, setGutscheinCode] = useState("");
+  const [gsInfo, setGsInfo] = useState<string | null>(null);
   const erhaltenCent = parseEuroToCent(erhaltenText);
   const zuWenig = art === "BAR" && erhaltenCent !== null && erhaltenCent < summeCent;
 
   function bezahlen() {
     if (zuWenig || laedt) return;
-    onBezahlen(art === "BAR" ? erhaltenCent : null, art);
+    onBezahlen(
+      art === "BAR" ? erhaltenCent : null,
+      art,
+      art === "GUTSCHEIN" ? gutscheinCode.trim() || null : null,
+    );
+  }
+
+  async function gutscheinPruefen() {
+    const c = gutscheinCode.trim();
+    if (!c) return;
+    setGsInfo("Prüfe …");
+    try {
+      const g = await jsonFetch<{ restCent: number; aktiv: boolean }>(`/api/gutschein/${encodeURIComponent(c)}`);
+      setGsInfo(g.aktiv ? `Guthaben: ${formatCent(g.restCent)}` : "Gutschein ist deaktiviert.");
+    } catch (e) {
+      setGsInfo((e as Error).message);
+    }
   }
 
   function sumupOeffnen() {
@@ -120,7 +139,26 @@ export function ZahlModal({
               </p>
             </div>
           ) : (
-            <p className="text-sm text-neutral-400">Gutschein entgegennehmen, dann „Bezahlt" bestätigen.</p>
+            <div className="space-y-2">
+              <input
+                className="input w-full"
+                placeholder="Gutschein-Code (optional)"
+                value={gutscheinCode}
+                onChange={(e) => {
+                  setGutscheinCode(e.target.value);
+                  setGsInfo(null);
+                }}
+              />
+              <div className="flex items-center gap-2 flex-wrap">
+                <button type="button" className="btn-ghost text-sm" onClick={gutscheinPruefen} disabled={!gutscheinCode.trim()}>
+                  Guthaben prüfen
+                </button>
+                {gsInfo && <span className="text-sm text-neutral-300">{gsInfo}</span>}
+              </div>
+              <p className="text-xs text-neutral-400">
+                Mit Code wird das Restguthaben verrechnet; ohne Code wird der Gutschein nur vermerkt.
+              </p>
+            </div>
           )}
 
           {fehler && (

@@ -121,7 +121,7 @@ export function DirektverkaufPanel() {
 
   // Schritt 1: „Bezahlen" bucht NICHT, sondern zeigt die komplette Rechnung zur
   // Kontrolle. Rückgeld wird lokal berechnet (Server rechnet beim Abschluss erneut).
-  function bezahlen(gegebenCent: number | null, art: string) {
+  function bezahlen(gegebenCent: number | null, art: string, gutscheinCode?: string | null) {
     if (anzahl === 0) return;
     const rueckgeldCent = art === "BAR" && gegebenCent != null && gegebenCent >= summe ? gegebenCent - summe : null;
     setBeleg({
@@ -130,6 +130,7 @@ export function DirektverkaufPanel() {
       art,
       gegebenCent: art === "BAR" ? gegebenCent : null,
       rueckgeldCent,
+      gutscheinCode: gutscheinCode ?? null,
     });
     setAbschlussFehler(null);
     setOffen(false);
@@ -156,6 +157,7 @@ export function DirektverkaufPanel() {
             positionen: positionen.map((p) => ({ produktId: p.produktId, menge: p.menge })),
             gegebenCent: beleg.gegebenCent,
             art: beleg.art,
+            gutscheinCode: beleg.gutscheinCode ?? null,
           }),
         },
       );

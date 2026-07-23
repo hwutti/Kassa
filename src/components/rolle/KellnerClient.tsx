@@ -269,7 +269,7 @@ export function KellnerClient() {
 
   // Schritt 1 – bestehende Bestellung kassieren: „Bezahlen" bucht NICHT, sondern
   // zeigt die komplette Rechnung zur Kontrolle (einheitlich wie am Tresen).
-  function bezahlen(gegebenCent: number | null, art: string) {
+  function bezahlen(gegebenCent: number | null, art: string, gutscheinCode?: string | null) {
     if (!zahlFuer) return;
     setBeleg({
       positionen: zahlFuer.positionen,
@@ -277,6 +277,7 @@ export function KellnerClient() {
       art,
       gegebenCent: art === "BAR" ? gegebenCent : null,
       rueckgeldCent: rueckgeldVon(zahlFuer.summeCent, gegebenCent, art),
+      gutscheinCode: gutscheinCode ?? null,
     });
     setBelegKontext({ typ: "zahlung", bestellungId: zahlFuer.id, nummer: zahlFuer.nummer, tisch: zahlFuer.tisch ?? zahlFuer.abholnummer, verkaeufer: zahlFuer.verkaeufer ?? null });
     setAbschlussFehler(null);
@@ -284,7 +285,7 @@ export function KellnerClient() {
   }
 
   // Schritt 1 – Direktverkauf/Tresen: dieselbe Rechnungsprüfung, Kontext „direkt".
-  function bezahlenDirekt(gegebenCent: number | null, art: string) {
+  function bezahlenDirekt(gegebenCent: number | null, art: string, gutscheinCode?: string | null) {
     if (anzahl === 0) return;
     setBeleg({
       positionen: positionen.map((p) => ({ produktName: p.name, menge: p.menge, einzelpreisCent: p.preisCent, summeCent: p.preisCent * p.menge })),
@@ -292,6 +293,7 @@ export function KellnerClient() {
       art,
       gegebenCent: art === "BAR" ? gegebenCent : null,
       rueckgeldCent: rueckgeldVon(summe, gegebenCent, art),
+      gutscheinCode: gutscheinCode ?? null,
     });
     setBelegKontext({ typ: "direkt" });
     setAbschlussFehler(null);
@@ -322,6 +324,7 @@ export function KellnerClient() {
               positionen: positionen.map((p) => ({ produktId: p.produktId, menge: p.menge })),
               gegebenCent: beleg.gegebenCent,
               art: beleg.art,
+              gutscheinCode: beleg.gutscheinCode ?? null,
             }),
           },
         );
@@ -346,7 +349,7 @@ export function KellnerClient() {
       } else {
         const res = await jsonFetch<{ rueckgeldCent: number | null }>(`/api/bestellungen/${belegKontext.bestellungId}/zahlung`, {
           method: "POST",
-          body: JSON.stringify({ gegebenCent: beleg.gegebenCent, art: beleg.art }),
+          body: JSON.stringify({ gegebenCent: beleg.gegebenCent, art: beleg.art, gutscheinCode: beleg.gutscheinCode ?? null }),
         });
         if (macheBon) {
           setBonVorschau({

@@ -126,6 +126,22 @@ export function BestellungenAdmin() {
     }
   }
 
+  async function erstatten(b: Bestellung) {
+    const ok = await dialog.confirm({
+      titel: `Nr. ${b.nummer} erstatten?`,
+      text: `${formatCent(b.summeCent)} zurückgeben. Die Bestellung zählt danach nicht mehr zum Umsatz.`,
+      bestaetigenText: "Erstatten",
+      gefahr: true,
+    });
+    if (!ok) return;
+    try {
+      await jsonFetch(`/api/bestellungen/${b.id}/erstattung`, { method: "POST", body: JSON.stringify({}) });
+      laden(filter ?? "");
+    } catch (e) {
+      await dialog.alert({ titel: "Fehler", text: (e as Error).message });
+    }
+  }
+
   const sichtbar = nurAktive ? liste.filter((b) => b.status !== "STORNIERT") : liste;
   const anzahlStorno = liste.filter((b) => b.status === "STORNIERT").length;
 
@@ -166,7 +182,14 @@ export function BestellungenAdmin() {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold">Nr. {b.nummer}</span>
               <StatusPille status={b.bestellStatus} />
-              {!storniert && <ZahlungBadge bezahlt={b.zahlungStatus === "PAID"} />}
+              {!storniert &&
+                (b.zahlungStatus === "REFUNDED" ? (
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full ring-1 bg-amber-500/20 text-amber-100 ring-amber-400/40">
+                    Erstattet
+                  </span>
+                ) : (
+                  <ZahlungBadge bezahlt={b.zahlungStatus === "PAID"} />
+                ))}
               <span className="text-xs text-neutral-400">
                 {new Date(b.createdAt).toLocaleString("de-AT")} · {b.verkaufsbereichName}
                 {b.veranstaltungName ? ` · ${b.veranstaltungName}` : ""}
@@ -177,6 +200,11 @@ export function BestellungenAdmin() {
               <button className="btn-ghost py-1.5 text-sm" onClick={() => bonDrucken(b)}>
                 Bon
               </button>
+              {!storniert && b.zahlungStatus === "PAID" && (
+                <button className="btn-ghost py-1.5 text-amber-200 text-sm" onClick={() => erstatten(b)}>
+                  Erstatten
+                </button>
+              )}
               {!storniert && (
                 <button className="btn-ghost py-1.5 text-red-300 text-sm" onClick={() => stornieren(b)}>
                   Stornieren

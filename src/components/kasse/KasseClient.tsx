@@ -88,7 +88,7 @@ export function KasseClient() {
   }, []);
 
   // Schritt 1: „Bezahlen" bucht NICHT, sondern zeigt die komplette Rechnung zur Kontrolle.
-  function bezahlen(gegebenCent: number | null, art: string) {
+  function bezahlen(gegebenCent: number | null, art: string, gutscheinCode?: string | null) {
     if (!zahlFuer) return;
     const s = zahlFuer.summeCent;
     const rueckgeldCent = art === "BAR" && gegebenCent != null && gegebenCent >= s ? gegebenCent - s : null;
@@ -98,6 +98,7 @@ export function KasseClient() {
       art,
       gegebenCent: art === "BAR" ? gegebenCent : null,
       rueckgeldCent,
+      gutscheinCode: gutscheinCode ?? null,
     });
     setKontext({ bestellungId: zahlFuer.id, nummer: zahlFuer.nummer, tisch: zahlFuer.tisch ?? zahlFuer.abholnummer, verkaeufer: zahlFuer.verkaeufer });
     setAbschlussFehler(null);
@@ -119,7 +120,7 @@ export function KasseClient() {
     try {
       const res = await jsonFetch<{ rueckgeldCent: number | null }>(`/api/bestellungen/${kontext.bestellungId}/zahlung`, {
         method: "POST",
-        body: JSON.stringify({ gegebenCent: beleg.gegebenCent, art: beleg.art }),
+        body: JSON.stringify({ gegebenCent: beleg.gegebenCent, art: beleg.art, gutscheinCode: beleg.gutscheinCode ?? null }),
       });
       if (drucken || bonAutoDruck) {
         setBonVorschau({
