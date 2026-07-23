@@ -17,6 +17,7 @@ export async function GET() {
       design: e.design,
       sumupAffiliateKey: e.sumupAffiliateKey,
       bonAutoDruck: e.bonAutoDruck,
+      rawbtAktiv: e.rawbtAktiv,
       bedienungsmodus: e.bedienungsmodus,
     });
   } catch (e) {
@@ -32,6 +33,7 @@ const UpdateSchema = z.object({
   design: z.enum(["dunkel", "glas", "aurora", "modern", "cool", "mitternacht"]).optional(),
   sumupAffiliateKey: z.string().trim().max(200).nullable().optional(),
   bonAutoDruck: z.boolean().optional(),
+  rawbtAktiv: z.boolean().optional(),
   bedienungsmodus: z.enum(["SZENARIO_1", "SZENARIO_2"]).optional(),
 });
 
@@ -49,6 +51,7 @@ export async function PATCH(req: Request) {
       design: e.design,
       sumupAffiliateKey: e.sumupAffiliateKey,
       bonAutoDruck: e.bonAutoDruck,
+      rawbtAktiv: e.rawbtAktiv,
       bedienungsmodus: e.bedienungsmodus,
     });
   } catch (e) {

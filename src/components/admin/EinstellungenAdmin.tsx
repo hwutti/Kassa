@@ -11,6 +11,7 @@ type Konfig = {
   design: string;
   sumupAffiliateKey: string | null;
   bonAutoDruck: boolean;
+  rawbtAktiv: boolean;
   bedienungsmodus: string;
 };
 
@@ -44,6 +45,7 @@ export function EinstellungenAdmin() {
   const [design, setDesign] = useState("dunkel");
   const [sumupKey, setSumupKey] = useState("");
   const [bonAutoDruck, setBonAutoDruck] = useState(false);
+  const [rawbtAktiv, setRawbtAktiv] = useState(false);
   const [bedienungsmodus, setBedienungsmodus] = useState("SZENARIO_1");
   const [fehler, setFehler] = useState<string | null>(null);
   const [gespeichert, setGespeichert] = useState(false);
@@ -59,6 +61,7 @@ export function EinstellungenAdmin() {
         setDesign(k.design ?? "dunkel");
         setSumupKey(k.sumupAffiliateKey ?? "");
         setBonAutoDruck(Boolean(k.bonAutoDruck));
+        setRawbtAktiv(Boolean(k.rawbtAktiv));
         setBedienungsmodus(k.bedienungsmodus === "SZENARIO_2" ? "SZENARIO_2" : "SZENARIO_1");
       })
       .catch((e) => setFehler((e as Error).message));
@@ -100,6 +103,7 @@ export function EinstellungenAdmin() {
           design,
           sumupAffiliateKey: sumupKey.trim() || null,
           bonAutoDruck,
+          rawbtAktiv,
           bedienungsmodus,
         }),
       });
@@ -275,6 +279,21 @@ export function EinstellungenAdmin() {
             onChange={(e) => setBonAutoDruck(e.target.checked)}
           />
           <span className="text-sm">Bon nach der Zahlung automatisch drucken (Systemdrucker)</span>
+        </label>
+        <label className="flex items-start gap-2">
+          <input
+            type="checkbox"
+            className="accent-brand-600 h-4 w-4 mt-0.5"
+            checked={rawbtAktiv}
+            onChange={(e) => setRawbtAktiv(e.target.checked)}
+          />
+          <span className="text-sm">
+            RawBT-Direktdruck (Android)
+            <span className="block text-[11px] text-neutral-500">
+              Sendet den Beleg ohne Druckdialog an einen per RawBT eingerichteten Bluetooth-Thermodrucker. Zusätzlicher Knopf
+              „Direkt drucken" in der Beleg-Vorschau. Voraussetzung: RawBT-App am Tablet installiert und mit dem Drucker gekoppelt.
+            </span>
+          </span>
         </label>
       </div>
 
