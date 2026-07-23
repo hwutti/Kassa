@@ -17,6 +17,7 @@ import { BonVorschau } from "@/components/rolle/BonVorschau";
 import { type BonDaten } from "@/lib/bon";
 import { minutenSeit } from "@/lib/zeit";
 import { uuid } from "@/lib/id";
+import { queueAdd, queueRemove, queueList, queueCount } from "@/lib/offlineQueue";
 
 type MeineBestellung = {
   id: string;
@@ -62,6 +63,10 @@ export function KellnerClient() {
   const [erledigtHeute, setErledigtHeute] = useState(0);
   const [darfZahlen, setDarfZahlen] = useState(true);
   const [fehler, setFehler] = useState<string | null>(null);
+  // Offline-Warteschlange (aufgenommene Bestellungen bei Verbindungsverlust).
+  const [ausstehend, setAusstehend] = useState(0);
+  const [online, setOnline] = useState(true);
+  const [syncHinweis, setSyncHinweis] = useState<string | null>(null);
 
   // Bezahl-Modal (Kassieren einer bestehenden Bestellung)
   const [zahlFuer, setZahlFuer] = useState<MeineBestellung | null>(null);
@@ -248,11 +253,79 @@ export function KellnerClient() {
         });
       }
     } catch (e) {
-      setFehler((e as Error).message);
+      // Nur bei echtem Verbindungsverlust offline puffern – Validierungsfehler normal zeigen.
+      const offline = typeof navigator !== "undefined" && (!navigator.onLine || e instanceof TypeError);
+      if (offline) {
+        queueAdd({
+          clientRef: clientRef.current,
+          tisch: tisch.trim() || null,
+          gast: gast.trim() || null,
+          notiz: notiz.trim() || null,
+          positionen: positionen.map((p) => ({ produktId: p.produktId, menge: p.menge })),
+          gestelltAm: Date.now(),
+          anzahl,
+          summeCent: summe,
+        });
+        clientRef.current = uuid();
+        setKorb({});
+        setTisch("");
+        setGast("");
+        setNotiz("");
+        setAusstehend(queueCount());
+        setSyncHinweis("Kein Netz – Bestellung offline gespeichert; wird automatisch gesendet, sobald wieder Verbindung besteht.");
+      } else {
+        setFehler((e as Error).message);
+      }
     } finally {
       setSenden(false);
     }
   }
+
+  // Gepufferte Bestellungen senden (idempotent über clientRef).
+  const syncQueue = useCallback(async () => {
+    const liste = queueList();
+    if (liste.length === 0) return;
+    for (const o of liste) {
+      try {
+        await jsonFetch("/api/kellner/bestellungen", {
+          method: "POST",
+          body: JSON.stringify({ clientRef: o.clientRef, tisch: o.tisch, gast: o.gast, notiz: o.notiz, positionen: o.positionen }),
+        });
+        queueRemove(o.clientRef);
+      } catch (e) {
+        const status = (e as { status?: number }).status;
+        // Netzwerkfehler oder Serverfehler (5xx): Eintrag behalten, später erneut versuchen.
+        if (e instanceof TypeError || (typeof navigator !== "undefined" && !navigator.onLine) || (status != null && status >= 500)) break;
+        // Endgültige Ablehnung (4xx, z. B. Produkt nicht mehr verkäuflich): entfernen und melden.
+        queueRemove(o.clientRef);
+        setSyncHinweis(`Eine offline gespeicherte Bestellung wurde abgelehnt: ${(e as Error).message}`);
+      }
+    }
+    setAusstehend(queueCount());
+    aktualisieren();
+  }, [aktualisieren]);
+
+  // Offline-Status verfolgen und die Warteschlange senden, sobald wieder Netz da ist.
+  useEffect(() => {
+    if (typeof navigator !== "undefined") setOnline(navigator.onLine);
+    setAusstehend(queueCount());
+    syncQueue();
+    const on = () => {
+      setOnline(true);
+      syncQueue();
+    };
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    const t = setInterval(() => {
+      if (queueCount() > 0 && navigator.onLine) syncQueue();
+    }, 15000);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+      clearInterval(t);
+    };
+  }, [syncQueue]);
 
   async function aktion(id: string, pfad: string, body?: unknown) {
     try {
@@ -411,6 +484,18 @@ export function KellnerClient() {
       </RollenHeader>
 
       {fehler && <p className="text-red-300 text-sm px-3 pt-2">{fehler}</p>}
+      {!online && (
+        <p className="text-amber-200 text-sm px-3 pt-2">📴 Offline – Bestellungen werden lokal gespeichert und später automatisch gesendet.</p>
+      )}
+      {ausstehend > 0 && (
+        <p className="text-amber-200 text-sm px-3 pt-1">
+          ⏳ {ausstehend} Bestellung(en) warten auf Übertragung.
+          <button className="underline ml-2" onClick={syncQueue}>
+            Jetzt senden
+          </button>
+        </p>
+      )}
+      {syncHinweis && <p className="text-amber-200 text-sm px-3 pt-1">{syncHinweis}</p>}
 
       {tab === "neu" && (
         <div className="flex-1 flex min-h-0">

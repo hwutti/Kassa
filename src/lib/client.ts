@@ -13,7 +13,9 @@ export async function jsonFetch<T = unknown>(
   const text = await res.text();
   const daten = text ? JSON.parse(text) : null;
   if (!res.ok) {
-    throw new Error(daten?.error ?? `Fehler ${res.status}`);
+    const err = new Error(daten?.error ?? `Fehler ${res.status}`) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
   }
   return daten as T;
 }
