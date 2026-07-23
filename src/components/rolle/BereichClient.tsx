@@ -19,11 +19,37 @@ type Ticket = {
   notiz: string | null;
   kellner: string;
   bestellzeit: string;
-  positionen: { produktName: string; menge: number; notiz: string | null; bildUrl: string | null; icon: string | null }[];
+  positionen: Position[];
+};
+type Position = {
+  id: string;
+  produktId: string;
+  produktName: string;
+  kategorieName: string;
+  menge: number;
+  notiz: string | null;
+  status: string;
+  bildUrl: string | null;
+  icon: string | null;
 };
 
 function minuten(iso: string): number {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+}
+
+/** Positionen nach Kategorie gruppieren (Reihenfolge des ersten Auftretens). */
+function nachKategorie(positionen: Position[]): { kategorie: string; posten: Position[] }[] {
+  const gruppen: { kategorie: string; posten: Position[] }[] = [];
+  for (const p of positionen) {
+    const kat = p.kategorieName || "Sonstiges";
+    let g = gruppen.find((x) => x.kategorie === kat);
+    if (!g) {
+      g = { kategorie: kat, posten: [] };
+      gruppen.push(g);
+    }
+    g.posten.push(p);
+  }
+  return gruppen;
 }
 
 export function BereichClient() {
@@ -59,6 +85,21 @@ export function BereichClient() {
         body: JSON.stringify({ status, version: t.version }),
       });
       laden();
+    } catch (e) {
+      setFehler((e as Error).message);
+      laden();
+    }
+  }
+
+  // Einzelne Position als fertig/offen markieren (Fortschritt bei großen Bestellungen).
+  async function positionUmschalten(p: Position) {
+    const fertig = !(p.status === "READY" || p.status === "COLLECTED");
+    // Optimistisch aktualisieren, dann Server.
+    setTickets((ts) =>
+      ts.map((t) => ({ ...t, positionen: t.positionen.map((x) => (x.id === p.id ? { ...x, status: fertig ? "READY" : "QUEUED" } : x)) })),
+    );
+    try {
+      await jsonFetch(`/api/bereich/position/${p.id}`, { method: "POST", body: JSON.stringify({ fertig }) });
     } catch (e) {
       setFehler((e as Error).message);
       laden();
@@ -112,30 +153,71 @@ export function BereichClient() {
                             {alt} min{alt >= 6 ? " ⚠" : ""}
                           </span>
                         </div>
-                        <div className="text-xs text-neutral-400">
-                          {t.kellner}
-                          {t.tisch ? ` · Tisch ${t.tisch}` : ""}
-                          {t.abholnummer ? ` · Abhol-Nr. ${t.abholnummer}` : ""}
-                          {t.gast ? ` · ${t.gast}` : ""}
+                        <div className="text-xs text-neutral-400 flex items-center justify-between gap-2">
+                          <span>
+                            {t.kellner}
+                            {t.tisch ? ` · Tisch ${t.tisch}` : ""}
+                            {t.abholnummer ? ` · Abhol-Nr. ${t.abholnummer}` : ""}
+                            {t.gast ? ` · ${t.gast}` : ""}
+                          </span>
+                          {t.positionen.length > 1 &&
+                            (() => {
+                              const fertigN = t.positionen.filter((p) => p.status === "READY" || p.status === "COLLECTED").length;
+                              const komplett = fertigN === t.positionen.length;
+                              return (
+                                <span
+                                  className={`shrink-0 font-semibold rounded-full px-2 py-0.5 ${
+                                    komplett ? "bg-emerald-500 text-white" : "bg-neutral-700 text-neutral-100"
+                                  }`}
+                                >
+                                  {fertigN}/{t.positionen.length} fertig
+                                </span>
+                              );
+                            })()}
                         </div>
-                        <ul className="mt-2 text-sm space-y-1">
-                          {t.positionen.map((p, i) => (
-                            <li key={i} className="flex items-center gap-2">
-                              <span className="h-9 w-9 shrink-0 rounded bg-neutral-800 flex items-center justify-center overflow-hidden">
-                                {p.bildUrl ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={p.bildUrl} alt="" className="h-full w-full object-cover" />
-                                ) : (
-                                  <span className="text-lg">{p.icon || "🍽️"}</span>
-                                )}
-                              </span>
-                              <span className="min-w-0">
-                                <span className="font-medium">{p.menge}×</span> {p.produktName}
-                                {p.notiz && <span className="text-amber-300"> — {p.notiz}</span>}
-                              </span>
-                            </li>
+                        <div className="mt-2 space-y-2">
+                          {nachKategorie(t.positionen).map((g) => (
+                            <div key={g.kategorie}>
+                              <div className="text-[11px] uppercase tracking-wide text-neutral-500 mb-0.5">{g.kategorie}</div>
+                              <ul className="space-y-0.5">
+                                {g.posten.map((p) => {
+                                  const fertig = p.status === "READY" || p.status === "COLLECTED";
+                                  return (
+                                    <li key={p.id}>
+                                      <button
+                                        onClick={() => positionUmschalten(p)}
+                                        className={`w-full flex items-center gap-2 text-left rounded-lg px-1 py-1 text-sm transition ${
+                                          fertig ? "opacity-60" : "hover:bg-neutral-800/60"
+                                        }`}
+                                        aria-pressed={fertig}
+                                      >
+                                        <span className="h-9 w-9 shrink-0 rounded bg-neutral-800 flex items-center justify-center overflow-hidden">
+                                          {p.bildUrl ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={p.bildUrl} alt="" className="h-full w-full object-cover" />
+                                          ) : (
+                                            <span className="text-lg">{p.icon || "🍽️"}</span>
+                                          )}
+                                        </span>
+                                        <span className={`min-w-0 flex-1 ${fertig ? "line-through" : ""}`}>
+                                          <span className="font-medium">{p.menge}×</span> {p.produktName}
+                                          {p.notiz && <span className="text-amber-300"> — {p.notiz}</span>}
+                                        </span>
+                                        <span
+                                          className={`shrink-0 h-6 w-6 rounded-full flex items-center justify-center text-sm font-bold ${
+                                            fertig ? "bg-emerald-500 text-white" : "border border-neutral-500 text-transparent"
+                                          }`}
+                                        >
+                                          ✓
+                                        </span>
+                                      </button>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
                           ))}
-                        </ul>
+                        </div>
                         {t.notiz && <div className="mt-1 text-xs text-amber-300">⚠ {t.notiz}</div>}
                         <div className="mt-2 flex gap-2">
                           {t.status === "QUEUED" && (

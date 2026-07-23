@@ -50,7 +50,10 @@ export async function GET() {
             kellner: { select: { anzeigename: true, benutzername: true } },
             positionen: {
               select: {
+                id: true,
+                produktId: true,
                 produktName: true,
+                kategorieName: true,
                 menge: true,
                 notiz: true,
                 arbeitsbereichId: true,
@@ -79,9 +82,13 @@ export async function GET() {
       positionen: t.bestellung.positionen
         .filter((p) => p.arbeitsbereichId === t.arbeitsbereichId)
         .map((p) => ({
+          id: p.id,
+          produktId: p.produktId,
           produktName: p.produktName,
+          kategorieName: p.kategorieName,
           menge: p.menge,
           notiz: p.notiz,
+          status: p.status,
           bildUrl: p.produkt?.bildUrl ?? null,
           icon: p.produkt?.icon ?? null,
         })),
