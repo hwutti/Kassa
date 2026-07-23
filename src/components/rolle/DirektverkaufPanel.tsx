@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { jsonFetch } from "@/lib/client";
+import { useLive } from "@/lib/useLive";
 import { formatCent } from "@/lib/money";
 import { ZahlModal } from "@/components/rolle/ZahlModal";
 import { BelegUebersicht, type Beleg } from "@/components/rolle/BelegUebersicht";
@@ -37,13 +38,18 @@ export function DirektverkaufPanel() {
     logoUrl: null,
   });
 
+  const ladeProdukte = useCallback(async () => {
+    try {
+      const d = await jsonFetch<{ kategorien: Kat[]; produkte: Prod[] }>("/api/kellner/produkte");
+      setKategorien(d.kategorien);
+      setProdukte(d.produkte);
+    } catch (e) {
+      setFehler((e as Error).message);
+    }
+  }, []);
+
   useEffect(() => {
-    jsonFetch<{ kategorien: Kat[]; produkte: Prod[] }>("/api/kellner/produkte")
-      .then((d) => {
-        setKategorien(d.kategorien);
-        setProdukte(d.produkte);
-      })
-      .catch((e) => setFehler((e as Error).message));
+    ladeProdukte();
     jsonFetch<{ sumupAffiliateKey: string | null }>("/api/kasse/konfig")
       .then((k) => setSumupKey(k.sumupAffiliateKey))
       .catch(() => undefined);
@@ -54,7 +60,9 @@ export function DirektverkaufPanel() {
         setKonfig({ titel: k.titel || "Kirchtag", untertitel: k.aktiveVeranstaltung?.name ?? k.untertitel ?? null, logoUrl: k.logoUrl ?? null }),
       )
       .catch(() => undefined);
-  }, []);
+  }, [ladeProdukte]);
+  // Live: Ausverkauft-Status/Produktänderungen sofort übernehmen.
+  useLive(ladeProdukte);
 
   const positionen = Object.values(korb);
   const summe = positionen.reduce((s, p) => s + p.preisCent * p.menge, 0);

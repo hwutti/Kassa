@@ -81,13 +81,18 @@ export function KellnerClient() {
     logoUrl: null,
   });
 
+  const ladeProdukte = useCallback(async () => {
+    try {
+      const d = await jsonFetch<{ kategorien: Kat[]; produkte: Prod[] }>("/api/kellner/produkte");
+      setKategorien(d.kategorien);
+      setProdukte(d.produkte);
+    } catch (e) {
+      setFehler((e as Error).message);
+    }
+  }, []);
+
   useEffect(() => {
-    jsonFetch<{ kategorien: Kat[]; produkte: Prod[] }>("/api/kellner/produkte")
-      .then((d) => {
-        setKategorien(d.kategorien);
-        setProdukte(d.produkte);
-      })
-      .catch((e) => setFehler((e as Error).message));
+    ladeProdukte();
     jsonFetch<{ sumupAffiliateKey: string | null; bedienungsmodus?: string; bonAutoDruck?: boolean }>("/api/kasse/konfig")
       .then((k) => {
         setSumupKey(k.sumupAffiliateKey);
@@ -102,7 +107,7 @@ export function KellnerClient() {
         setKonfig({ titel: k.titel || "Kirchtag", untertitel: k.aktiveVeranstaltung?.name ?? k.untertitel ?? null, logoUrl: k.logoUrl ?? null }),
       )
       .catch(() => undefined);
-  }, []);
+  }, [ladeProdukte]);
 
   const ladeMeine = useCallback(async () => {
     try {
@@ -131,7 +136,11 @@ export function KellnerClient() {
   useEffect(() => {
     aktualisieren();
   }, [aktualisieren]);
-  useLive(aktualisieren);
+  // Live-Tick: Bestellungen UND Produktliste (Ausverkauft-Status) aktualisieren.
+  useLive(() => {
+    aktualisieren();
+    ladeProdukte();
+  });
 
   const positionen = Object.values(korb);
   const summe = positionen.reduce((s, p) => s + p.preisCent * p.menge, 0);
