@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 import { formatCent } from "@/lib/money";
 import { RollenHeader } from "@/components/rolle/RollenHeader";
@@ -10,14 +10,13 @@ import { ZahlModal } from "@/components/rolle/ZahlModal";
 import { BelegUebersicht, type Beleg } from "@/components/rolle/BelegUebersicht";
 import { StatusKopf, ZahlungBadge, BereichChip } from "@/components/rolle/StatusUi";
 import { Kpi } from "@/components/ui/Kpi";
+import { ProduktGrid, type Kat, type Prod, type Korb } from "@/components/verkauf/ProduktGrid";
+import { Warenkorb } from "@/components/verkauf/Warenkorb";
 import { InstallButton } from "@/components/kasse/InstallButton";
 import { druckeBon, type BonDaten } from "@/lib/bon";
 import { minutenSeit } from "@/lib/zeit";
 import { uuid } from "@/lib/id";
 
-type Kat = { id: string; name: string; farbe: string | null; icon: string | null };
-type Prod = { id: string; name: string; preisCent: number; icon: string | null; bildUrl: string | null; barcode: string | null; kategorieId: string };
-type Pos = { produktId: string; name: string; preisCent: number; menge: number };
 type MeineBestellung = {
   id: string;
   nummer: number;
@@ -46,9 +45,7 @@ export function KellnerClient() {
   // Produkte / Warenkorb
   const [kategorien, setKategorien] = useState<Kat[]>([]);
   const [produkte, setProdukte] = useState<Prod[]>([]);
-  const [katFilter, setKatFilter] = useState<string | null>(null);
-  const [suche, setSuche] = useState("");
-  const [korb, setKorb] = useState<Record<string, Pos>>({});
+  const [korb, setKorb] = useState<Korb>({});
   const [tisch, setTisch] = useState("");
   const [gast, setGast] = useState("");
   const [notiz, setNotiz] = useState("");
@@ -136,14 +133,6 @@ export function KellnerClient() {
   }, [aktualisieren]);
   useLive(aktualisieren);
 
-  const gefiltert = useMemo(() => {
-    const q = suche.trim().toLowerCase();
-    return produkte.filter((p) => {
-      if (katFilter && p.kategorieId !== katFilter) return false;
-      if (q && !p.name.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [produkte, katFilter, suche]);
   const positionen = Object.values(korb);
   const summe = positionen.reduce((s, p) => s + p.preisCent * p.menge, 0);
   const anzahl = positionen.reduce((s, p) => s + p.menge, 0);
@@ -380,89 +369,7 @@ export function KellnerClient() {
 
       {tab === "neu" && (
         <div className="flex-1 flex min-h-0">
-          <main className="flex-1 min-w-0 flex flex-col">
-            <div className="shrink-0 p-3 border-b border-neutral-800 space-y-2">
-              <input
-                type="search"
-                className="input"
-                placeholder="Produkt suchen oder Barcode scannen …"
-                value={suche}
-                onChange={(e) => setSuche(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  const code = suche.trim();
-                  if (!code) return;
-                  // Barcode-Scanner tippt den Code + Enter: exakter Treffer -> in den Korb.
-                  const treffer = produkte.find((p) => p.barcode && p.barcode === code);
-                  if (treffer) {
-                    plus(treffer);
-                    setSuche("");
-                  }
-                }}
-              />
-              <div className="flex gap-2 overflow-x-auto">
-                <button className={`chip-cat ${!katFilter ? "on" : ""}`} onClick={() => setKatFilter(null)}>
-                  Alle
-                </button>
-                {kategorien.map((k) => (
-                  <button key={k.id} className={`chip-cat ${katFilter === k.id ? "on" : ""}`} onClick={() => setKatFilter(k.id)}>
-                    {k.icon} {k.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                {gefiltert.map((p) => (
-                  <div
-                    key={p.id}
-                    className={`card p-0 overflow-hidden flex flex-col ${korb[p.id] ? "ring-2 ring-brand-600 border-brand-600" : ""}`}
-                  >
-                    {/* Großes Produktbild (oder Icon) – antippen legt in den Korb. */}
-                    <button onClick={() => plus(p)} className="text-left active:scale-[.98] transition">
-                      <div className="relative aspect-[4/3] bg-neutral-800 flex items-center justify-center">
-                        {p.bildUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={p.bildUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                        ) : (
-                          <span className="text-4xl leading-none">{p.icon || "🍽️"}</span>
-                        )}
-                        {korb[p.id] && (
-                          <span className="absolute top-1 right-1 badge bg-brand-600 text-white shadow">{korb[p.id].menge}×</span>
-                        )}
-                      </div>
-                      <div className="p-2">
-                        <div className="font-medium leading-tight line-clamp-2">{p.name}</div>
-                        <div className="mt-0.5 text-brand-50 font-semibold tabular-nums">{formatCent(p.preisCent)}</div>
-                      </div>
-                    </button>
-                    {/* Menge direkt an der Kachel anpassen. */}
-                    <div className="mt-auto flex items-center gap-1 p-1.5 border-t border-neutral-800">
-                      <button
-                        onClick={() => menge(p.id, -1)}
-                        disabled={!korb[p.id]}
-                        aria-label={`${p.name}: Menge verringern`}
-                        className="h-10 flex-1 rounded-lg bg-neutral-800 text-xl font-semibold active:bg-neutral-700 disabled:opacity-30"
-                      >
-                        −
-                      </button>
-                      <span className="w-8 text-center tabular-nums font-semibold" aria-live="polite">
-                        {korb[p.id]?.menge ?? 0}
-                      </span>
-                      <button
-                        onClick={() => plus(p)}
-                        aria-label={`${p.name}: Menge erhöhen`}
-                        className="h-10 flex-1 rounded-lg bg-brand-600 text-white text-xl font-semibold active:bg-brand-700"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                {gefiltert.length === 0 && <p className="text-neutral-400 col-span-full p-4">Keine Produkte mit Preis.</p>}
-              </div>
-            </div>
-          </main>
+          <ProduktGrid kategorien={kategorien} produkte={produkte} korb={korb} onPlus={plus} onMenge={menge} />
 
           <aside className="w-80 shrink-0 border-l border-neutral-800 flex flex-col">
             <div className="p-3 border-b border-neutral-800 space-y-2">
@@ -498,28 +405,7 @@ export function KellnerClient() {
                 <p className="text-[11px] text-neutral-400">Tresen: Kunde bestellt, bekommt &amp; zahlt direkt am Stand.</p>
               )}
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
-              {positionen.length === 0 ? (
-                <p className="text-neutral-500 text-sm text-center p-4">Produkte antippen …</p>
-              ) : (
-                positionen.map((p) => (
-                  <div key={p.produktId} className="card p-2 flex items-center gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="truncate font-medium">{p.name}</div>
-                      <div className="text-xs text-neutral-400 tabular-nums">
-                        {formatCent(p.preisCent)} × {p.menge}
-                      </div>
-                    </div>
-                    <button className="btn-ghost h-8 w-8 !px-0 !min-h-0" onClick={() => menge(p.produktId, -1)}>–</button>
-                    <span className="w-6 text-center tabular-nums">{p.menge}</span>
-                    <button className="btn-ghost h-8 w-8 !px-0 !min-h-0" onClick={() => menge(p.produktId, +1)}>+</button>
-                  </div>
-                ))
-              )}
-              {positionen.length > 0 && (
-                <input className="input" placeholder="Notiz (optional)" value={notiz} onChange={(e) => setNotiz(e.target.value)} />
-              )}
-            </div>
+            <Warenkorb positionen={positionen} onMenge={menge} notiz={notiz} setNotiz={setNotiz} />
             <div className="shrink-0 border-t border-neutral-800 p-3 space-y-2">
               <div className="flex justify-between items-baseline">
                 <span className="text-neutral-300">Gesamt</span>
