@@ -10,7 +10,7 @@ import { ereignisSenden } from "@/lib/ereignisse";
 export const dynamic = "force-dynamic";
 
 const Schema = z.object({
-  status: z.enum(["ACCEPTED", "IN_PREPARATION", "READY", "CANCELLED"]),
+  status: z.enum(["QUEUED", "ACCEPTED", "IN_PREPARATION", "READY", "CANCELLED"]),
   version: z.number().int().nonnegative(),
 });
 
@@ -40,8 +40,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       data: {
         status,
         version: { increment: 1 },
-        bearbeiterId: session.sub,
-        angenommenAm: status === "ACCEPTED" ? jetzt : undefined,
+        // Zurückgegeben (QUEUED): Bearbeiter/Annahme zurücksetzen, damit es wieder frei ist.
+        bearbeiterId: status === "QUEUED" ? null : session.sub,
+        angenommenAm: status === "ACCEPTED" ? jetzt : status === "QUEUED" ? null : undefined,
         fertigAm: status === "READY" ? jetzt : undefined,
       },
     });

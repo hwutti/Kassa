@@ -148,9 +148,14 @@ export function BereichClient() {
                             </>
                           )}
                           {(t.status === "ACCEPTED" || t.status === "IN_PREPARATION") && (
-                            <button className="btn-primary flex-1 py-1.5 text-sm" onClick={() => setzen(t, "READY")}>
-                              Fertig
-                            </button>
+                            <>
+                              <button className="btn-ghost py-1.5 text-sm" onClick={() => setzen(t, "QUEUED")}>
+                                Zurückgeben
+                              </button>
+                              <button className="btn-primary flex-1 py-1.5 text-sm" onClick={() => setzen(t, "READY")}>
+                                Fertig
+                              </button>
+                            </>
                           )}
                           {t.status === "READY" && (
                             <span className="text-xs text-neutral-500 py-1.5">wartet auf Kellner …</span>

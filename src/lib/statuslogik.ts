@@ -11,8 +11,9 @@ export type TicketStatus =
 // Erlaubte Ticket-Übergänge (einfache Produkte dürfen ACCEPTED->READY überspringen).
 const TICKET_UEBERGAENGE: Record<TicketStatus, TicketStatus[]> = {
   QUEUED: ["ACCEPTED", "IN_PREPARATION", "READY", "CANCELLED"],
-  ACCEPTED: ["IN_PREPARATION", "READY", "CANCELLED"],
-  IN_PREPARATION: ["READY", "CANCELLED"],
+  // Zurückgeben (-> QUEUED) erlaubt, falls jemand die Bearbeitung doch abgibt.
+  ACCEPTED: ["IN_PREPARATION", "READY", "CANCELLED", "QUEUED"],
+  IN_PREPARATION: ["READY", "CANCELLED", "QUEUED"],
   READY: ["COLLECTED", "IN_PREPARATION"], // versehentlich fertig -> zurück erlaubt
   COLLECTED: [],
   CANCELLED: [],

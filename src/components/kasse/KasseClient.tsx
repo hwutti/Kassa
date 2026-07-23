@@ -7,7 +7,7 @@ import { RollenHeader } from "@/components/rolle/RollenHeader";
 import { InstallButton } from "@/components/kasse/InstallButton";
 import { ZahlModal } from "@/components/rolle/ZahlModal";
 import { BelegUebersicht, type Beleg } from "@/components/rolle/BelegUebersicht";
-import { BESTELL_STATUS_LABEL } from "@/lib/statuslogik";
+import { StatusKopf, ZahlungBadge, BereichChip, minutenSeit } from "@/components/rolle/StatusUi";
 import { useLive } from "@/lib/useLive";
 import { druckeBon } from "@/lib/bon";
 
@@ -165,57 +165,38 @@ export function KasseClient() {
           <p className="text-neutral-400 text-center py-10">Keine offenen Zahlungen. 🎉</p>
         )}
 
-        {bestellungen.map((b) => {
-          const bereit = b.auslieferungStatus === "READY_FOR_PICKUP";
-          const ausgeliefert = b.auslieferungStatus === "DELIVERED";
-          return (
-            <div
-              key={b.id}
-              className={`card p-3 border-l-4 ${bereit ? "border-brand-600" : ausgeliefert ? "border-blue-500" : "border-neutral-700"}`}
-            >
+        {bestellungen.map((b) => (
+          <div key={b.id} className="card p-0 overflow-hidden">
+            <StatusKopf status={b.bestellStatus} minuten={minutenSeit(b.createdAt)} />
+            <div className="p-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="font-semibold">
+                <span className="font-semibold text-base">
                   Nr. {b.nummer}
                   {b.tisch ? ` · Tisch ${b.tisch}` : b.abholnummer ? ` · Nr. ${b.abholnummer}` : ""}
                   {b.gast ? ` · ${b.gast}` : ""}
                 </span>
-                <span className="badge bg-neutral-700 text-neutral-300">
-                  {BESTELL_STATUS_LABEL[b.bestellStatus] ?? b.bestellStatus}
-                </span>
+                <ZahlungBadge bezahlt={b.zahlungStatus === "PAID"} />
               </div>
 
               <div className="mt-1 text-xs text-neutral-400">Verkäufer: {b.verkaeufer}</div>
 
               {b.bereiche.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
+                <div className="mt-2 flex flex-wrap gap-1.5">
                   {b.bereiche.map((a, i) => (
-                    <span
-                      key={i}
-                      className={`text-xs rounded px-1.5 py-0.5 border ${
-                        a.status === "READY" || a.status === "COLLECTED"
-                          ? "border-brand-600/50 text-brand-50"
-                          : "border-blue-500/50 text-blue-200"
-                      }`}
-                    >
-                      {a.name}
-                      {a.status === "READY" || a.status === "COLLECTED" ? " ✓" : " …"}
-                    </span>
+                    <BereichChip key={i} name={a.name} status={a.status} />
                   ))}
                 </div>
               )}
 
               <div className="mt-2 flex items-center gap-2 flex-wrap">
-                <span className="text-lg font-semibold tabular-nums">{formatCent(b.summeCent)}</span>
-                <button
-                  className="btn-primary py-1.5 text-sm ml-auto"
-                  onClick={() => setZahlFuer(b)}
-                >
+                <span className="text-lg font-bold text-neutral-50 tabular-nums">{formatCent(b.summeCent)}</span>
+                <button className="btn-primary py-1.5 text-sm ml-auto" onClick={() => setZahlFuer(b)}>
                   Kassieren
                 </button>
               </div>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
       {zahlFuer && (

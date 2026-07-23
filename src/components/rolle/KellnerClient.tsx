@@ -5,10 +5,10 @@ import { jsonFetch } from "@/lib/client";
 import { formatCent } from "@/lib/money";
 import { RollenHeader } from "@/components/rolle/RollenHeader";
 import { useDialog } from "@/components/ui/DialogProvider";
-import { BESTELL_STATUS_LABEL } from "@/lib/statuslogik";
 import { useLive } from "@/lib/useLive";
 import { ZahlModal } from "@/components/rolle/ZahlModal";
 import { BelegUebersicht, type Beleg } from "@/components/rolle/BelegUebersicht";
+import { StatusKopf, ZahlungBadge, BereichChip, minutenSeit } from "@/components/rolle/StatusUi";
 import { InstallButton } from "@/components/kasse/InstallButton";
 import { druckeBon, type BonDaten } from "@/lib/bon";
 
@@ -41,56 +41,6 @@ function uuid() {
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-// Voll deckende, gut unterscheidbare Statusfarben für den Kopfbalken jeder Karte
-// (POS-Standard: auffälliger Farbbalken oben + Symbol + Text, nicht nur Rand).
-const STATUS_INFO: Record<string, { icon: string; kopf: string }> = {
-  SUBMITTED: { icon: "📤", kopf: "bg-slate-600 text-white" },
-  IN_PROGRESS: { icon: "⏳", kopf: "bg-blue-600 text-white" },
-  READY_FOR_PICKUP: { icon: "✅", kopf: "bg-emerald-600 text-white" },
-  COLLECTED: { icon: "🛎️", kopf: "bg-indigo-600 text-white" },
-  DELIVERED: { icon: "🍽️", kopf: "bg-teal-600 text-white" },
-  COMPLETED: { icon: "✔️", kopf: "bg-emerald-700 text-white" },
-  CANCELLED: { icon: "✖️", kopf: "bg-red-600 text-white" },
-};
-function statusInfo(s: string) {
-  return STATUS_INFO[s] ?? STATUS_INFO.SUBMITTED;
-}
-function minutenSeit(iso?: string): number | null {
-  if (!iso) return null;
-  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
-}
-
-/** Vollbreiter, farbiger Status-Kopf: Symbol + Text + Wartezeit. Auf einen Blick erkennbar. */
-function StatusKopf({ status, minuten }: { status: string; minuten: number | null }) {
-  const info = statusInfo(status);
-  const alt = minuten != null && minuten >= 6;
-  return (
-    <div className={`flex items-center justify-between gap-2 px-3 py-2 ${info.kopf}`}>
-      <span className="font-bold text-sm flex items-center gap-1.5">
-        <span className="text-base leading-none">{info.icon}</span>
-        {BESTELL_STATUS_LABEL[status] ?? status}
-      </span>
-      {minuten != null && (
-        <span className={`text-xs font-bold tabular-nums ${alt ? "bg-black/30 rounded px-1.5 py-0.5" : "opacity-90"}`}>
-          {alt ? "⏰ " : ""}
-          {minuten} min
-        </span>
-      )}
-    </div>
-  );
-}
-/** Zahlungsstatus als farbige Pille. */
-function ZahlungBadge({ bezahlt }: { bezahlt: boolean }) {
-  return (
-    <span
-      className={`text-xs font-semibold px-2.5 py-1 rounded-full ring-1 whitespace-nowrap ${
-        bezahlt ? "bg-emerald-500/25 text-emerald-50 ring-emerald-400/50" : "bg-amber-500/25 text-amber-50 ring-amber-400/50"
-      }`}
-    >
-      {bezahlt ? "Bezahlt ✓" : "Zahlung offen"}
-    </span>
-  );
-}
 
 export function KellnerClient() {
   const dialog = useDialog();
@@ -629,19 +579,9 @@ export function KellnerClient() {
                   </div>
                   {b.bereiche.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {b.bereiche.map((a, i) => {
-                        const fertig = a.status === "READY" || a.status === "COLLECTED";
-                        return (
-                          <span
-                            key={i}
-                            className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-1 ${
-                              fertig ? "bg-emerald-500 text-white" : "bg-amber-500 text-black"
-                            }`}
-                          >
-                            {fertig ? "✓" : "⏳"} {a.name} {fertig ? "fertig" : "in Arbeit"}
-                          </span>
-                        );
-                      })}
+                      {b.bereiche.map((a, i) => (
+                        <BereichChip key={i} name={a.name} status={a.status} />
+                      ))}
                     </div>
                   )}
                   <div className="mt-2 flex items-center gap-2 flex-wrap">

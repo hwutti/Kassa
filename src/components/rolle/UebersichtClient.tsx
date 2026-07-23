@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 import { formatCent } from "@/lib/money";
 import { RollenHeader } from "@/components/rolle/RollenHeader";
-import { BESTELL_STATUS_LABEL } from "@/lib/statuslogik";
+import { StatusPille, ZahlungBadge } from "@/components/rolle/StatusUi";
 import { useLive } from "@/lib/useLive";
 
 type Bestellung = {
@@ -87,34 +87,31 @@ export function UebersichtClient() {
                         <td className="py-2 px-3">
                           <div className="flex flex-wrap gap-1">
                             {b.bereiche.length === 0 && <span className="text-neutral-500">—</span>}
-                            {b.bereiche.map((a, i) => (
-                              <span
-                                key={i}
-                                className={`text-xs rounded px-1.5 py-0.5 border ${
-                                  a.status === "READY" || a.status === "COLLECTED"
-                                    ? "border-brand-600/50 text-brand-50"
-                                    : a.status === "IN_PREPARATION" || a.status === "ACCEPTED"
-                                      ? "border-blue-500/50 text-blue-200"
-                                      : "border-neutral-700 text-neutral-400"
-                                }`}
-                              >
-                                {a.name}
-                                {a.status === "READY" || a.status === "COLLECTED" ? " ✓" : "…"}
-                              </span>
-                            ))}
+                            {b.bereiche.map((a, i) => {
+                              const fertig = a.status === "READY" || a.status === "COLLECTED";
+                              const inArbeit = a.status === "IN_PREPARATION" || a.status === "ACCEPTED";
+                              return (
+                                <span
+                                  key={i}
+                                  className={`text-xs font-medium rounded-full px-2 py-0.5 ${
+                                    fertig
+                                      ? "bg-emerald-500 text-white"
+                                      : inArbeit
+                                        ? "bg-amber-500 text-black"
+                                        : "bg-neutral-700 text-neutral-200"
+                                  }`}
+                                >
+                                  {fertig ? "✓" : inArbeit ? "⏳" : "•"} {a.name}
+                                </span>
+                              );
+                            })}
                           </div>
                         </td>
                         <td className="py-2 px-3">
-                          <span
-                            className={`badge ${b.bestellStatus === "READY_FOR_PICKUP" ? "bg-brand-600/20 text-brand-50" : "bg-neutral-700 text-neutral-300"}`}
-                          >
-                            {BESTELL_STATUS_LABEL[b.bestellStatus] ?? b.bestellStatus}
-                          </span>
+                          <StatusPille status={b.bestellStatus} />
                         </td>
                         <td className="py-2 px-3">
-                          <span className={`badge ${b.zahlungStatus === "PAID" ? "bg-brand-600/20 text-brand-50" : "bg-amber-500/20 text-amber-200"}`}>
-                            {b.zahlungStatus === "PAID" ? "bezahlt" : "offen"}
-                          </span>
+                          <ZahlungBadge bezahlt={b.zahlungStatus === "PAID"} />
                         </td>
                         <td className="py-2 px-3 text-right tabular-nums">{formatCent(b.summeCent)}</td>
                         <td className={`py-2 px-3 text-right tabular-nums ${alt >= 8 ? "text-red-300 font-bold" : "text-neutral-400"}`}>
