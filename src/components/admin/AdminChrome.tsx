@@ -44,6 +44,9 @@ export function AdminChrome({ benutzer, children }: { benutzer: string; children
           <h1 className="text-lg font-semibold">Verwaltung</h1>
           <span className="text-xs text-neutral-400 hidden sm:inline">angemeldet als {benutzer}</span>
           <div className="ml-auto flex items-center gap-2">
+            <a href="/schulung.html" target="_blank" rel="noopener" className="btn-ghost py-1.5 text-sm">
+              🎓 Schulung
+            </a>
             <Link href="/kasse" className="btn-ghost py-1.5 text-sm">
               → Zur Kasse
             </Link>
