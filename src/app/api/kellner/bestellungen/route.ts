@@ -7,6 +7,7 @@ import { requireRolle } from "@/lib/auth";
 import { darfKellner } from "@/lib/rollen";
 import { bestellungNeuBerechnen, auditLog } from "@/lib/bestelllogik";
 import { ereignisSenden } from "@/lib/ereignisse";
+import { druckeKuechentickets } from "@/lib/ticketdruck";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -120,6 +121,8 @@ export async function POST(req: Request) {
       await bestellungNeuBerechnen(erstellt.id);
       await auditLog({ bestellungId: erstellt.id, benutzerId: session.sub, benutzerName: session.name, typ: "BESTELLUNG_ABGESENDET", neuerWert: `Nr. ${erstellt.nummer}` });
       ereignisSenden("bestellung-neu");
+      // Küchen-/Ausgabetickets auf Netzwerkdruckern ausgeben (best-effort, nicht blockierend).
+      void druckeKuechentickets(erstellt.id);
       return ok({ bestellung: serialize(erstellt), doppelt: false }, { status: 201 });
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {

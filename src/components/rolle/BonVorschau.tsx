@@ -12,13 +12,30 @@ import { druckeRawbt } from "@/lib/rawbt";
  * immer zurück. Ist RawBT-Direktdruck in den Einstellungen aktiv, erscheint
  * zusätzlich „Direkt drucken" (an den Thermodrucker, ohne Dialog).
  */
+type Netzdrucker = { id: string; name: string };
+
 export function BonVorschau({ daten, onSchliessen }: { daten: BonDaten; onSchliessen: () => void }) {
   const [rawbt, setRawbt] = useState(false);
+  const [netzdrucker, setNetzdrucker] = useState<Netzdrucker[]>([]);
+  const [netzStatus, setNetzStatus] = useState<string | null>(null);
   useEffect(() => {
-    jsonFetch<{ rawbtAktiv?: boolean }>("/api/kasse/konfig")
-      .then((k) => setRawbt(k.rawbtAktiv === true))
+    jsonFetch<{ rawbtAktiv?: boolean; netzdrucker?: Netzdrucker[] }>("/api/kasse/konfig")
+      .then((k) => {
+        setRawbt(k.rawbtAktiv === true);
+        setNetzdrucker(k.netzdrucker ?? []);
+      })
       .catch(() => undefined);
   }, []);
+
+  async function netzdruck(d: Netzdrucker) {
+    setNetzStatus(`Sende an ${d.name} …`);
+    try {
+      await jsonFetch("/api/print", { method: "POST", body: JSON.stringify({ druckerId: d.id, bon: daten }) });
+      setNetzStatus(`✓ An ${d.name} gedruckt`);
+    } catch (e) {
+      setNetzStatus(`Fehler: ${(e as Error).message}`);
+    }
+  }
 
   return (
     <Modal onSchliessen={onSchliessen} cardClass="w-full max-w-xs max-h-[94dvh] flex flex-col p-0 overflow-hidden">
@@ -30,6 +47,12 @@ export function BonVorschau({ daten, onSchliessen }: { daten: BonDaten; onSchlie
         <iframe title="Beleg-Vorschau" srcDoc={bonHtml(daten)} className="w-[80mm] h-[62vh] border-0 bg-white" />
       </div>
       <div className="p-3 border-t border-neutral-800 shrink-0 space-y-2">
+        {netzdrucker.map((d) => (
+          <button key={d.id} className="btn-ghost w-full" onClick={() => netzdruck(d)}>
+            🖨️ An {d.name} senden
+          </button>
+        ))}
+        {netzStatus && <p className="text-xs text-center text-neutral-400">{netzStatus}</p>}
         {rawbt && (
           <button className="btn-primary w-full" onClick={() => druckeRawbt(daten)}>
             ⚡ Direkt drucken (RawBT)
