@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { jsonFetch } from "@/lib/client";
+import { Kpi } from "@/components/ui/Kpi";
 
 type Status = {
   aktiveProdukte: number;
@@ -52,17 +53,17 @@ export function KassenbereitschaftDashboard() {
       {/* Kennzahlen */}
       {status && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <Kennzahl label="Aktive Produkte" wert={status.aktiveProdukte} />
-          <Kennzahl label="Verkaufbar" wert={status.verkaufbareProdukte} gut />
-          <Kennzahl
+          <Kpi label="Aktive Produkte" wert={status.aktiveProdukte} />
+          <Kpi label="Verkaufbar" wert={status.verkaufbareProdukte} ton="gut" />
+          <Kpi
             label="Aktiv ohne Preis"
             wert={status.aktiveOhnePreis}
-            warnAb={1}
-            hinweis="Preis fehlt"
+            ton="warnung"
+            hinweis={status.aktiveOhnePreis >= 1 ? "Preis fehlt" : undefined}
           />
-          <Kennzahl label="Deaktiviert/archiviert" wert={status.deaktivierte} />
-          <Kennzahl label="Inaktive Kategorie" wert={status.mitInaktiverKategorie} warnAb={1} />
-          <Kennzahl label="Ohne Verkaufsbereich" wert={status.ohneVerkaufsbereich} warnAb={1} />
+          <Kpi label="Deaktiviert/archiviert" wert={status.deaktivierte} />
+          <Kpi label="Inaktive Kategorie" wert={status.mitInaktiverKategorie} ton="warnung" />
+          <Kpi label="Ohne Verkaufsbereich" wert={status.ohneVerkaufsbereich} ton="warnung" />
         </div>
       )}
 
@@ -81,35 +82,6 @@ export function KassenbereitschaftDashboard() {
         <Karte href="/admin/bestellungen" titel="Bestellungen" text="Bestellungen einsehen und stornieren." />
         <Karte href="/admin/auswertungen" titel="Auswertungen" text="Umsätze und Verkaufszahlen." />
       </div>
-    </div>
-  );
-}
-
-function Kennzahl({
-  label,
-  wert,
-  gut,
-  warnAb,
-  hinweis,
-}: {
-  label: string;
-  wert: number;
-  gut?: boolean;
-  warnAb?: number;
-  hinweis?: string;
-}) {
-  const warn = warnAb !== undefined && wert >= warnAb;
-  return (
-    <div className="card p-3">
-      <div
-        className={`text-2xl font-bold tabular-nums ${
-          gut ? "text-brand-50" : warn ? "text-amber-300" : ""
-        }`}
-      >
-        {wert}
-      </div>
-      <div className="text-xs text-neutral-400">{label}</div>
-      {warn && hinweis && <div className="text-xs text-amber-300 mt-0.5">{hinweis}</div>}
     </div>
   );
 }

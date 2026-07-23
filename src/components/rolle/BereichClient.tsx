@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 import { RollenHeader } from "@/components/rolle/RollenHeader";
 import { DirektverkaufPanel } from "@/components/rolle/DirektverkaufPanel";
+import { LiveBadge } from "@/components/ui/Badge";
 import { useLive } from "@/lib/useLive";
 
 type Ticket = {
@@ -83,7 +84,7 @@ export function BereichClient() {
             </button>
           </div>
         )}
-        {modus === "tickets" && <span className="badge bg-brand-600/20 text-brand-50">● Live</span>}
+        {modus === "tickets" && <LiveBadge />}
       </RollenHeader>
 
       {modus === "direkt" ? (

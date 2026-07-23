@@ -6,6 +6,7 @@ import { formatCent } from "@/lib/money";
 import { RollenHeader } from "@/components/rolle/RollenHeader";
 import { StatusPille, ZahlungBadge, BereichChip } from "@/components/rolle/StatusUi";
 import { Kpi } from "@/components/ui/Kpi";
+import { LiveBadge } from "@/components/ui/Badge";
 import { useLive } from "@/lib/useLive";
 import { minutenSeit } from "@/lib/zeit";
 
@@ -47,7 +48,7 @@ export function UebersichtClient() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <RollenHeader titel="Globale Übersicht">
-        <span className="badge bg-brand-600/20 text-brand-50">● Live</span>
+        <LiveBadge />
       </RollenHeader>
       <div className="flex-1 overflow-y-auto p-3 space-y-4">
         {fehler && <p className="text-red-300 text-sm">{fehler}</p>}

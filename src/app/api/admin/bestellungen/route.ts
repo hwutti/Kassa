@@ -24,6 +24,8 @@ export async function GET(req: Request) {
         id: b.id,
         nummer: b.nummer,
         status: b.status,
+        bestellStatus: b.bestellStatus,
+        zahlungStatus: b.zahlungStatus,
         summeCent: b.summeCent,
         erhaltenCent: b.erhaltenCent,
         rueckgeldCent: b.rueckgeldCent,

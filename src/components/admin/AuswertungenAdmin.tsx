@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
+import { Kpi } from "@/components/ui/Kpi";
 import { formatCent } from "@/lib/money";
 
 type NameUmsatz = { name: string; umsatzCent: number };
@@ -117,12 +118,12 @@ export function AuswertungenAdmin() {
         <>
           {/* Kennzahlen */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <Kennzahl label="Gesamtumsatz" wert={formatCent(daten.gesamtumsatzCent)} gross />
-            <Kennzahl label="Tagesumsatz (heute)" wert={formatCent(daten.tagesumsatzCent)} />
-            <Kennzahl label="Bestellungen" wert={String(daten.anzahlBestellungen)} />
-            <Kennzahl label="Ø Bestellwert" wert={formatCent(daten.durchschnittCent)} />
-            <Kennzahl label="Ø Zubereitung" wert={`${daten.zubereitungMinDurchschnitt} min`} />
-            <Kennzahl label="Storniert" wert={String(daten.anzahlStorniert)} />
+            <Kpi label="Gesamtumsatz" wert={formatCent(daten.gesamtumsatzCent)} ton="gut" gross />
+            <Kpi label="Tagesumsatz (heute)" wert={formatCent(daten.tagesumsatzCent)} />
+            <Kpi label="Bestellungen" wert={daten.anzahlBestellungen} />
+            <Kpi label="Ø Bestellwert" wert={formatCent(daten.durchschnittCent)} />
+            <Kpi label="Ø Zubereitung" wert={`${daten.zubereitungMinDurchschnitt} min`} />
+            <Kpi label="Storniert" wert={daten.anzahlStorniert} />
           </div>
 
           {daten.jeKellner.length > 0 && (
@@ -194,15 +195,6 @@ export function AuswertungenAdmin() {
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-function Kennzahl({ label, wert, gross }: { label: string; wert: string; gross?: boolean }) {
-  return (
-    <div className="card p-3">
-      <div className={`font-bold tabular-nums ${gross ? "text-2xl text-brand-50" : "text-xl"}`}>{wert}</div>
-      <div className="text-xs text-neutral-400">{label}</div>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 import { useDialog } from "@/components/ui/DialogProvider";
+import { StatusPille, ZahlungBadge } from "@/components/rolle/StatusUi";
 import { formatCent } from "@/lib/money";
 import { druckeBon, type BonDaten } from "@/lib/bon";
 
@@ -10,6 +11,8 @@ type Bestellung = {
   id: string;
   nummer: number;
   status: string;
+  bestellStatus: string;
+  zahlungStatus: string;
   summeCent: number;
   erhaltenCent: number | null;
   rueckgeldCent: number | null;
@@ -157,9 +160,10 @@ export function BestellungenAdmin() {
         const storniert = b.status === "STORNIERT";
         return (
           <div key={b.id} className={`card p-3 ${storniert ? "opacity-70" : ""}`}>
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold">Nr. {b.nummer}</span>
-              {storniert && <span className="badge bg-red-700/30 text-red-200">storniert</span>}
+              <StatusPille status={b.bestellStatus} />
+              {!storniert && <ZahlungBadge bezahlt={b.zahlungStatus === "PAID"} />}
               <span className="text-xs text-neutral-400">
                 {new Date(b.createdAt).toLocaleString("de-AT")} · {b.verkaufsbereichName}
                 {b.veranstaltungName ? ` · ${b.veranstaltungName}` : ""}
