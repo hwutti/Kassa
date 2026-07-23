@@ -40,6 +40,41 @@ function uuid() {
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+// Kräftige, gut unterscheidbare Farben je Bestellstatus (linker Rand + Pille).
+const STATUS_STIL: Record<string, { pille: string; rand: string }> = {
+  SUBMITTED: { pille: "bg-slate-500/30 text-slate-50 ring-1 ring-slate-400/50", rand: "border-slate-500" },
+  IN_PROGRESS: { pille: "bg-blue-500/30 text-blue-50 ring-1 ring-blue-400/50", rand: "border-blue-500" },
+  READY_FOR_PICKUP: { pille: "bg-emerald-500/30 text-emerald-50 ring-1 ring-emerald-400/60", rand: "border-emerald-500" },
+  COLLECTED: { pille: "bg-indigo-500/30 text-indigo-50 ring-1 ring-indigo-400/50", rand: "border-indigo-500" },
+  DELIVERED: { pille: "bg-teal-500/30 text-teal-50 ring-1 ring-teal-400/50", rand: "border-teal-500" },
+  COMPLETED: { pille: "bg-emerald-600/40 text-emerald-50 ring-1 ring-emerald-400/60", rand: "border-emerald-600" },
+  CANCELLED: { pille: "bg-red-500/30 text-red-50 ring-1 ring-red-400/50", rand: "border-red-500" },
+};
+function statusStil(s: string) {
+  return STATUS_STIL[s] ?? STATUS_STIL.SUBMITTED;
+}
+
+/** Große, gut sichtbare Status-Pille. */
+function StatusBadge({ status }: { status: string }) {
+  return (
+    <span className={`text-sm font-semibold px-3 py-1 rounded-full whitespace-nowrap ${statusStil(status).pille}`}>
+      {BESTELL_STATUS_LABEL[status] ?? status}
+    </span>
+  );
+}
+/** Zahlungsstatus als farbige Pille. */
+function ZahlungBadge({ bezahlt }: { bezahlt: boolean }) {
+  return (
+    <span
+      className={`text-xs font-semibold px-2.5 py-1 rounded-full ring-1 whitespace-nowrap ${
+        bezahlt ? "bg-emerald-500/25 text-emerald-50 ring-emerald-400/50" : "bg-amber-500/25 text-amber-50 ring-amber-400/50"
+      }`}
+    >
+      {bezahlt ? "Bezahlt ✓" : "Zahlung offen"}
+    </span>
+  );
+}
+
 export function KellnerClient() {
   const dialog = useDialog();
   const [tab, setTab] = useState<"neu" | "meine" | "ausgabe">("neu");
@@ -561,21 +596,17 @@ export function KellnerClient() {
             <p className="text-neutral-400 text-center py-8">Keine offenen Bestellungen. 🎉</p>
           )}
           {meine.map((b) => {
-            const bereit = b.auslieferungStatus === "READY_FOR_PICKUP";
-            const abgeholt = b.auslieferungStatus === "COLLECTED";
             const ausgeliefert = b.auslieferungStatus === "DELIVERED";
             const bezahlt = b.zahlungStatus === "PAID";
             return (
-              <div key={b.id} className={`card p-3 border-l-4 ${bereit ? "border-brand-600" : abgeholt ? "border-blue-500" : "border-neutral-700"}`}>
+              <div key={b.id} className={`card p-3 border-l-8 ${statusStil(b.bestellStatus).rand}`}>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="font-semibold">
+                  <span className="font-semibold text-base">
                     Nr. {b.nummer}
                     {b.tisch ? ` · Tisch ${b.tisch}` : b.abholnummer ? ` · Nr. ${b.abholnummer}` : ""}
                     {b.gast ? ` · ${b.gast}` : ""}
                   </span>
-                  <span className={`badge ${bereit ? "bg-brand-600/20 text-brand-50" : "bg-neutral-700 text-neutral-300"}`}>
-                    {BESTELL_STATUS_LABEL[b.bestellStatus] ?? b.bestellStatus}
-                  </span>
+                  <StatusBadge status={b.bestellStatus} />
                 </div>
                 {b.bereiche.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
@@ -584,7 +615,7 @@ export function KellnerClient() {
                         key={i}
                         className={`text-xs rounded px-1.5 py-0.5 border ${
                           a.status === "READY" || a.status === "COLLECTED"
-                            ? "border-brand-600/50 text-brand-50"
+                            ? "border-emerald-500/60 text-emerald-100"
                             : "border-blue-500/50 text-blue-200"
                         }`}
                       >
@@ -595,10 +626,13 @@ export function KellnerClient() {
                   </div>
                 )}
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
-                  <span className="text-sm text-neutral-400 tabular-nums">
-                    {formatCent(b.summeCent)} · {bezahlt ? "bezahlt ✓" : "Zahlung offen"}
-                    {ausgeliefert ? " · ausgeliefert ✓" : ""}
-                  </span>
+                  <span className="text-sm font-semibold text-neutral-100 tabular-nums">{formatCent(b.summeCent)}</span>
+                  <ZahlungBadge bezahlt={bezahlt} />
+                  {ausgeliefert && (
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full ring-1 bg-teal-500/25 text-teal-50 ring-teal-400/50">
+                      Ausgeliefert ✓
+                    </span>
+                  )}
                   <div className="ml-auto flex gap-2">
                     {!bezahlt && darfZahlen && (
                       <button className="btn-ghost py-1.5 text-sm" onClick={() => setZahlFuer(b)}>
@@ -629,17 +663,19 @@ export function KellnerClient() {
           {ausgabe.map((b) => {
             const bezahlt = b.zahlungStatus === "PAID";
             return (
-              <div key={b.id} className="card p-3 border-l-4 border-brand-600">
+              <div key={b.id} className="card p-3 border-l-8 border-emerald-500">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="font-semibold">
+                  <span className="font-semibold text-base">
                     Nr. {b.nummer}
                     {b.tisch ? ` · Tisch ${b.tisch}` : b.abholnummer ? ` · Nr. ${b.abholnummer}` : ""}
                     {b.gast ? ` · ${b.gast}` : ""}
                   </span>
-                  <span className="badge bg-brand-600/20 text-brand-50">Abholbereit</span>
+                  <StatusBadge status="READY_FOR_PICKUP" />
                 </div>
-                <div className="mt-1 text-xs text-neutral-400">
-                  Aufgenommen von {b.verkaeufer ?? "—"} · {formatCent(b.summeCent)} · {bezahlt ? "bezahlt ✓" : "Zahlung offen"}
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold text-neutral-100 tabular-nums">{formatCent(b.summeCent)}</span>
+                  <ZahlungBadge bezahlt={bezahlt} />
+                  <span className="text-xs text-neutral-500">von {b.verkaeufer ?? "—"}</span>
                 </div>
                 <div className="mt-2 flex items-center gap-2 flex-wrap justify-end">
                   {!bezahlt && darfZahlen && (
