@@ -18,6 +18,8 @@ import { uuid } from "@/lib/id";
  * ohne Ausgabe-Liste). Wird sowohl im Verkauf als auch im Bereich verwendet.
  * Erfordert Kassenrecht (serverseitig geprüft).
  */
+const DIREKT_ENTWURF_KEY = "direkt-entwurf-v1";
+
 export function DirektverkaufPanel() {
   const [kategorien, setKategorien] = useState<Kat[]>([]);
   const [produkte, setProdukte] = useState<Prod[]>([]);
@@ -25,6 +27,7 @@ export function DirektverkaufPanel() {
   const [notiz, setNotiz] = useState("");
   const [fehler, setFehler] = useState<string | null>(null);
   const clientRef = useRef(uuid());
+  const [hydriert, setHydriert] = useState(false);
 
   const [offen, setOffen] = useState(false);
   const [zahlFehler, setZahlFehler] = useState<string | null>(null);
@@ -65,6 +68,30 @@ export function DirektverkaufPanel() {
   }, [ladeProdukte]);
   // Live: Ausverkauft-Status/Produktänderungen sofort übernehmen.
   useLive(ladeProdukte);
+
+  // Entwurf lokal sichern (übersteht versehentliches Neuladen / Absturz).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DIREKT_ENTWURF_KEY);
+      if (raw) {
+        const d = JSON.parse(raw) as { korb?: Korb; notiz?: string };
+        if (d.korb && Object.keys(d.korb).length) setKorb(d.korb);
+        if (d.notiz) setNotiz(d.notiz);
+      }
+    } catch {
+      /* defekter Eintrag – ignorieren */
+    }
+    setHydriert(true);
+  }, []);
+  useEffect(() => {
+    if (!hydriert) return;
+    try {
+      if (Object.keys(korb).length === 0 && !notiz) localStorage.removeItem(DIREKT_ENTWURF_KEY);
+      else localStorage.setItem(DIREKT_ENTWURF_KEY, JSON.stringify({ korb, notiz }));
+    } catch {
+      /* Speicher gesperrt – ignorieren */
+    }
+  }, [hydriert, korb, notiz]);
 
   const positionen = Object.values(korb);
   const summe = positionen.reduce((s, p) => s + p.preisCent * p.menge, 0);

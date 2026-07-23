@@ -43,23 +43,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         ? gegebenCent - b.summeCent
         : null;
 
-    await prisma.$transaction([
-      prisma.zahlung.create({
-        data: {
-          bestellungId: id,
-          art,
-          betragCent: b.summeCent,
-          gegebenCent: erhaltenCent,
-          rueckgeldCent,
-          status: "PAID",
-          benutzerId: session.sub,
-        },
-      }),
-      prisma.bestellung.update({
-        where: { id },
-        data: { zahlungStatus: "PAID", zahlungsart: art, erhaltenCent, rueckgeldCent },
-      }),
-    ]);
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Optimistische Sperre: nur buchen, wenn noch UNPAID und nicht storniert –
+        // verhindert Doppel-Kassieren durch zwei Geräte gleichzeitig.
+        const upd = await tx.bestellung.updateMany({
+          where: { id, zahlungStatus: { not: "PAID" }, status: { not: "STORNIERT" } },
+          data: { zahlungStatus: "PAID", zahlungsart: art, erhaltenCent, rueckgeldCent, version: { increment: 1 } },
+        });
+        if (upd.count === 0) throw new Error("KONFLIKT");
+        await tx.zahlung.create({
+          data: {
+            bestellungId: id,
+            art,
+            betragCent: b.summeCent,
+            gegebenCent: erhaltenCent,
+            rueckgeldCent,
+            status: "PAID",
+            benutzerId: session.sub,
+          },
+        });
+      });
+    } catch (e) {
+      if (e instanceof Error && e.message === "KONFLIKT")
+        return fehler("Bestellung wurde zwischenzeitlich geändert (bereits bezahlt oder storniert).", 409);
+      throw e;
+    }
 
     const neu = await bestellungNeuBerechnen(id);
     await auditLog({ bestellungId: id, benutzerId: session.sub, benutzerName: session.name, typ: "ZAHLUNG_ERFASST", neuerWert: `PAID (${art})` });

@@ -39,6 +39,8 @@ type BelegKontext =
   | { typ: "zahlung"; bestellungId: string; nummer: number; tisch: string | null; verkaeufer: string | null };
 
 
+const ENTWURF_KEY = "kellner-entwurf-v1";
+
 export function KellnerClient() {
   const dialog = useDialog();
   const [tab, setTab] = useState<"neu" | "meine" | "ausgabe">("neu");
@@ -51,6 +53,7 @@ export function KellnerClient() {
   const [gast, setGast] = useState("");
   const [notiz, setNotiz] = useState("");
   const [senden, setSenden] = useState(false);
+  const [hydriert, setHydriert] = useState(false);
   const clientRef = useRef(uuid());
 
   // Meine Bestellungen + geteilte Ausgabe-Liste
@@ -110,6 +113,34 @@ export function KellnerClient() {
       )
       .catch(() => undefined);
   }, [ladeProdukte]);
+
+  // Entwurf (Warenkorb + Tisch/Gast/Notiz) lokal sichern, damit ein versehentliches
+  // Neuladen oder ein Absturz die offene Bestellung nicht verliert.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(ENTWURF_KEY);
+      if (raw) {
+        const d = JSON.parse(raw) as { korb?: Korb; tisch?: string; gast?: string; notiz?: string };
+        if (d.korb && Object.keys(d.korb).length) setKorb(d.korb);
+        if (d.tisch) setTisch(d.tisch);
+        if (d.gast) setGast(d.gast);
+        if (d.notiz) setNotiz(d.notiz);
+      }
+    } catch {
+      /* defekter Eintrag – ignorieren */
+    }
+    setHydriert(true);
+  }, []);
+  useEffect(() => {
+    if (!hydriert) return;
+    try {
+      const leer = Object.keys(korb).length === 0 && !tisch && !gast && !notiz;
+      if (leer) localStorage.removeItem(ENTWURF_KEY);
+      else localStorage.setItem(ENTWURF_KEY, JSON.stringify({ korb, tisch, gast, notiz }));
+    } catch {
+      /* Speicher voll/gesperrt – ignorieren */
+    }
+  }, [hydriert, korb, tisch, gast, notiz]);
 
   const ladeMeine = useCallback(async () => {
     try {

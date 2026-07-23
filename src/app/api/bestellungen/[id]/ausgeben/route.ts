@@ -24,17 +24,28 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     if (b.status === "STORNIERT") return fehler("Bestellung ist storniert.", 409);
     if (b.auslieferungStatus === "DELIVERED") return fehler("Bestellung ist bereits ausgegeben.", 409);
 
-    await prisma.$transaction([
-      prisma.bereichsticket.updateMany({
-        where: { bestellungId: id, status: { notIn: ["COLLECTED", "CANCELLED"] } },
-        data: { status: "COLLECTED", fertigAm: new Date(), abgeholtAm: new Date() },
-      }),
-      prisma.bestellPosition.updateMany({
-        where: { bestellungId: id, status: { not: "CANCELLED" } },
-        data: { status: "DELIVERED" },
-      }),
-      prisma.bestellung.update({ where: { id }, data: { auslieferungStatus: "DELIVERED" } }),
-    ]);
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Optimistische Sperre gegen doppelte/parallele Ausgabe.
+        const upd = await tx.bestellung.updateMany({
+          where: { id, status: { not: "STORNIERT" }, auslieferungStatus: { not: "DELIVERED" } },
+          data: { auslieferungStatus: "DELIVERED", version: { increment: 1 } },
+        });
+        if (upd.count === 0) throw new Error("KONFLIKT");
+        await tx.bereichsticket.updateMany({
+          where: { bestellungId: id, status: { notIn: ["COLLECTED", "CANCELLED"] } },
+          data: { status: "COLLECTED", fertigAm: new Date(), abgeholtAm: new Date() },
+        });
+        await tx.bestellPosition.updateMany({
+          where: { bestellungId: id, status: { not: "CANCELLED" } },
+          data: { status: "DELIVERED" },
+        });
+      });
+    } catch (e) {
+      if (e instanceof Error && e.message === "KONFLIKT")
+        return fehler("Bestellung wurde zwischenzeitlich geändert (bereits ausgegeben oder storniert).", 409);
+      throw e;
+    }
 
     const neu = await bestellungNeuBerechnen(id);
     await auditLog({ bestellungId: id, benutzerId: session.sub, benutzerName: session.name, typ: "AUSGEGEBEN", neuerWert: neu?.bestellStatus });

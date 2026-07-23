@@ -45,15 +45,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!bestellung) return fehler("Bestellung nicht gefunden.", 404);
     if (bestellung.status === "STORNIERT") return fehler("Bestellung ist bereits storniert.", 409);
 
-    const aktualisiert = await prisma.bestellung.update({
-      where: { id },
+    const upd = await prisma.bestellung.updateMany({
+      where: { id, status: { not: "STORNIERT" } },
       data: {
         status: "STORNIERT",
         bestellStatus: "CANCELLED",
         storniertAm: new Date(),
         stornoGrund: grund,
         storniertVon,
+        version: { increment: 1 },
       },
+    });
+    if (upd.count === 0) return fehler("Bestellung ist bereits storniert.", 409);
+    const aktualisiert = await prisma.bestellung.findUnique({
+      where: { id },
       select: { id: true, nummer: true, status: true },
     });
     ereignisSenden("storno");
