@@ -201,10 +201,12 @@ export function ProdukteAdmin() {
                 <img
                   src={p.bildUrl}
                   alt=""
-                  className="h-9 w-9 rounded object-cover shrink-0 bg-neutral-800"
+                  className="h-14 w-14 rounded-lg object-cover shrink-0 bg-neutral-800"
                 />
               ) : (
-                <span className="text-2xl w-9 text-center shrink-0">{p.icon || "📦"}</span>
+                <span className="h-14 w-14 rounded-lg bg-neutral-800 flex items-center justify-center text-3xl shrink-0">
+                  {p.icon || "📦"}
+                </span>
               )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
