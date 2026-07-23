@@ -27,7 +27,12 @@ type MeineBestellung = {
   zahlungStatus: string;
   auslieferungStatus: string;
   bereiche: { name: string; status: string }[];
+  positionen: { produktName: string; menge: number; einzelpreisCent: number; summeCent: number }[];
 };
+// Woraus die vorläufige Rechnung stammt: frischer Direktverkauf oder Zahlung einer bestehenden Bestellung.
+type BelegKontext =
+  | { typ: "direkt" }
+  | { typ: "zahlung"; bestellungId: string; nummer: number; tisch: string | null; verkaeufer: string | null };
 
 function uuid() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -58,11 +63,10 @@ export function KellnerClient() {
   const [darfZahlen, setDarfZahlen] = useState(true);
   const [fehler, setFehler] = useState<string | null>(null);
 
-  // Bezahl-Modal
+  // Bezahl-Modal (Kassieren einer bestehenden Bestellung)
   const [zahlFuer, setZahlFuer] = useState<MeineBestellung | null>(null);
-  const [zahlLaedt, setZahlLaedt] = useState(false);
-  const [zahlFehler, setZahlFehler] = useState<string | null>(null);
   const [sumupKey, setSumupKey] = useState<string | null>(null);
+  const [bonAutoDruck, setBonAutoDruck] = useState(false);
 
   // Ablauf fürs Fest (aus der Verwaltung). SZENARIO_1 = ein Kellner macht alles;
   // SZENARIO_2 = aufnehmen + sofort kassieren, Läufer liefert aus.
@@ -70,9 +74,9 @@ export function KellnerClient() {
   // Verkaufsart auf dem "Neue Bestellung"-Tab: Bedienung (Tisch) oder Direkt (Tresen).
   const [verkaufsart, setVerkaufsart] = useState<"bedienung" | "direkt">("bedienung");
   const [direktOffen, setDirektOffen] = useState(false);
-  const [direktFehler, setDirektFehler] = useState<string | null>(null);
-  // Direktverkauf: vorläufige Rechnung (Übersicht vor dem Buchen) + Abschluss.
+  // Einheitlicher Abschluss (wie am Tresen): vorläufige Rechnung + Kontext (woher) + Abschluss.
   const [beleg, setBeleg] = useState<Beleg | null>(null);
+  const [belegKontext, setBelegKontext] = useState<BelegKontext | null>(null);
   const [abschlussLaedt, setAbschlussLaedt] = useState(false);
   const [abschlussFehler, setAbschlussFehler] = useState<string | null>(null);
   const [konfig, setKonfig] = useState<{ titel: string; untertitel: string | null; logoUrl: string | null }>({
@@ -88,9 +92,10 @@ export function KellnerClient() {
         setProdukte(d.produkte);
       })
       .catch((e) => setFehler((e as Error).message));
-    jsonFetch<{ sumupAffiliateKey: string | null; bedienungsmodus?: string }>("/api/kasse/konfig")
+    jsonFetch<{ sumupAffiliateKey: string | null; bedienungsmodus?: string; bonAutoDruck?: boolean }>("/api/kasse/konfig")
       .then((k) => {
         setSumupKey(k.sumupAffiliateKey);
+        setBonAutoDruck(k.bonAutoDruck === true);
         if (k.bedienungsmodus === "SZENARIO_2") setBedienungsmodus("SZENARIO_2");
       })
       .catch(() => undefined);
@@ -198,7 +203,6 @@ export function KellnerClient() {
       aktualisieren();
       // Szenario 2: sofort kassieren – Bezahl-Dialog für die neue Bestellung öffnen.
       if (bedienungsmodus === "SZENARIO_2" && darfZahlen) {
-        setZahlFehler(null);
         setZahlFuer({
           id: neu.id,
           nummer: neu.nummer,
@@ -210,6 +214,7 @@ export function KellnerClient() {
           zahlungStatus: "UNPAID",
           auslieferungStatus: "NOT_READY",
           bereiche: [],
+          positionen: positionen.map((p) => ({ produktName: p.name, menge: p.menge, einzelpreisCent: p.preisCent, summeCent: p.preisCent * p.menge })),
         });
       }
     } catch (e) {
@@ -227,81 +232,111 @@ export function KellnerClient() {
       await dialog.alert({ titel: "Fehler", text: (e as Error).message });
     }
   }
-  async function bezahlen(gegebenCent: number | null, art: string) {
-    if (!zahlFuer || zahlLaedt) return;
-    setZahlLaedt(true);
-    setZahlFehler(null);
-    try {
-      await jsonFetch(`/api/bestellungen/${zahlFuer.id}/zahlung`, {
-        method: "POST",
-        body: JSON.stringify({ gegebenCent, art }),
-      });
-      setZahlFuer(null);
-      aktualisieren();
-    } catch (e) {
-      setZahlFehler((e as Error).message);
-    } finally {
-      setZahlLaedt(false);
-    }
+  // Rückgeld für die Vorschau lokal berechnen (Server rechnet beim Buchen erneut).
+  function rueckgeldVon(summeCent: number, gegebenCent: number | null, art: string): number | null {
+    return art === "BAR" && gegebenCent != null && gegebenCent >= summeCent ? gegebenCent - summeCent : null;
   }
-  // Direktverkauf Schritt 1: „Bezahlen" bucht NICHT, sondern zeigt die komplette
-  // Rechnung zur Kontrolle. Rückgeld lokal berechnet (Server rechnet beim Abschluss neu).
+
+  // Schritt 1 – bestehende Bestellung kassieren: „Bezahlen" bucht NICHT, sondern
+  // zeigt die komplette Rechnung zur Kontrolle (einheitlich wie am Tresen).
+  function bezahlen(gegebenCent: number | null, art: string) {
+    if (!zahlFuer) return;
+    setBeleg({
+      positionen: zahlFuer.positionen,
+      summeCent: zahlFuer.summeCent,
+      art,
+      gegebenCent: art === "BAR" ? gegebenCent : null,
+      rueckgeldCent: rueckgeldVon(zahlFuer.summeCent, gegebenCent, art),
+    });
+    setBelegKontext({ typ: "zahlung", bestellungId: zahlFuer.id, nummer: zahlFuer.nummer, tisch: zahlFuer.tisch ?? zahlFuer.abholnummer, verkaeufer: zahlFuer.verkaeufer ?? null });
+    setAbschlussFehler(null);
+    setZahlFuer(null);
+  }
+
+  // Schritt 1 – Direktverkauf/Tresen: dieselbe Rechnungsprüfung, Kontext „direkt".
   function bezahlenDirekt(gegebenCent: number | null, art: string) {
     if (anzahl === 0) return;
-    const rueckgeldCent = art === "BAR" && gegebenCent != null && gegebenCent >= summe ? gegebenCent - summe : null;
     setBeleg({
       positionen: positionen.map((p) => ({ produktName: p.name, menge: p.menge, einzelpreisCent: p.preisCent, summeCent: p.preisCent * p.menge })),
       summeCent: summe,
       art,
       gegebenCent: art === "BAR" ? gegebenCent : null,
-      rueckgeldCent,
+      rueckgeldCent: rueckgeldVon(summe, gegebenCent, art),
     });
+    setBelegKontext({ typ: "direkt" });
     setAbschlussFehler(null);
     setDirektOffen(false);
   }
-  // „Korrigieren": Rechnung verwerfen, zurück in den Warenkorb (nichts gebucht).
-  function direktKorrigieren() {
+
+  // „Korrigieren": zurück, es wird nichts gebucht.
+  function belegKorrigieren() {
     setBeleg(null);
+    setBelegKontext(null);
     setAbschlussFehler(null);
   }
-  // Direktverkauf Schritt 2: Verkauf jetzt buchen (erst hier entsteht der Datensatz), optional drucken.
-  async function direktAbschliessen(drucken: boolean) {
-    if (!beleg || abschlussLaedt) return;
+
+  // Schritt 2 – jetzt buchen (erst hier entsteht die Zahlung/der Verkauf), optional drucken.
+  async function belegAbschliessen(drucken: boolean) {
+    if (!beleg || !belegKontext || abschlussLaedt) return;
     setAbschlussLaedt(true);
     setAbschlussFehler(null);
     try {
-      const res = await jsonFetch<{ bestellung: { nummer: number; summeCent: number; erhaltenCent: number | null; rueckgeldCent: number | null; positionen: { produktName: string; menge: number; einzelpreisCent: number; summeCent: number }[] } }>(
-        "/api/kellner/direktverkauf",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            clientRef: clientRef.current,
-            positionen: positionen.map((p) => ({ produktId: p.produktId, menge: p.menge })),
-            gegebenCent: beleg.gegebenCent,
+      const macheBon = drucken || bonAutoDruck;
+      if (belegKontext.typ === "direkt") {
+        const res = await jsonFetch<{ bestellung: { nummer: number; summeCent: number; erhaltenCent: number | null; rueckgeldCent: number | null; positionen: { produktName: string; menge: number; einzelpreisCent: number; summeCent: number }[] } }>(
+          "/api/kellner/direktverkauf",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              clientRef: clientRef.current,
+              positionen: positionen.map((p) => ({ produktId: p.produktId, menge: p.menge })),
+              gegebenCent: beleg.gegebenCent,
+              art: beleg.art,
+            }),
+          },
+        );
+        const best = res.bestellung;
+        if (macheBon) {
+          druckeBon({
+            titel: konfig.titel,
+            untertitel: konfig.untertitel,
+            logoUrl: konfig.logoUrl,
+            nummer: best.nummer,
+            datum: new Date().toLocaleString("de-AT"),
+            positionen: best.positionen,
+            summeCent: best.summeCent,
             art: beleg.art,
-          }),
-        },
-      );
-      const best = res.bestellung;
-      if (drucken) {
-        const bon: BonDaten = {
-          titel: konfig.titel,
-          untertitel: konfig.untertitel,
-          logoUrl: konfig.logoUrl,
-          nummer: best.nummer,
-          datum: new Date().toLocaleString("de-AT"),
-          positionen: best.positionen,
-          summeCent: best.summeCent,
-          art: beleg.art,
-          gegebenCent: best.erhaltenCent,
-          rueckgeldCent: best.rueckgeldCent,
-        };
-        druckeBon(bon);
+            gegebenCent: best.erhaltenCent,
+            rueckgeldCent: best.rueckgeldCent,
+          });
+        }
+        clientRef.current = uuid();
+        setKorb({});
+        setNotiz("");
+      } else {
+        const res = await jsonFetch<{ rueckgeldCent: number | null }>(`/api/bestellungen/${belegKontext.bestellungId}/zahlung`, {
+          method: "POST",
+          body: JSON.stringify({ gegebenCent: beleg.gegebenCent, art: beleg.art }),
+        });
+        if (macheBon) {
+          druckeBon({
+            titel: konfig.titel,
+            untertitel: konfig.untertitel,
+            logoUrl: konfig.logoUrl,
+            nummer: belegKontext.nummer,
+            datum: new Date().toLocaleString("de-AT"),
+            verkaeufer: belegKontext.verkaeufer,
+            tisch: belegKontext.tisch,
+            positionen: beleg.positionen,
+            summeCent: beleg.summeCent,
+            art: beleg.art,
+            gegebenCent: beleg.gegebenCent,
+            rueckgeldCent: res?.rueckgeldCent ?? beleg.rueckgeldCent,
+          });
+        }
       }
-      clientRef.current = uuid();
-      setKorb({});
-      setNotiz("");
       setBeleg(null);
+      setBelegKontext(null);
       aktualisieren();
     } catch (e) {
       setAbschlussFehler((e as Error).message);
@@ -496,7 +531,6 @@ export function KellnerClient() {
                   className="btn-primary w-full"
                   onClick={() => {
                     if (anzahl === 0) return;
-                    setDirektFehler(null);
                     setDirektOffen(true);
                   }}
                   disabled={anzahl === 0}
@@ -567,13 +601,7 @@ export function KellnerClient() {
                   </span>
                   <div className="ml-auto flex gap-2">
                     {!bezahlt && darfZahlen && (
-                      <button
-                        className="btn-ghost py-1.5 text-sm"
-                        onClick={() => {
-                          setZahlFehler(null);
-                          setZahlFuer(b);
-                        }}
-                      >
+                      <button className="btn-ghost py-1.5 text-sm" onClick={() => setZahlFuer(b)}>
                         Kassieren
                       </button>
                     )}
@@ -615,13 +643,7 @@ export function KellnerClient() {
                 </div>
                 <div className="mt-2 flex items-center gap-2 flex-wrap justify-end">
                   {!bezahlt && darfZahlen && (
-                    <button
-                      className="btn-ghost py-1.5 text-sm"
-                      onClick={() => {
-                        setZahlFehler(null);
-                        setZahlFuer(b);
-                      }}
-                    >
+                    <button className="btn-ghost py-1.5 text-sm" onClick={() => setZahlFuer(b)}>
                       Kassieren
                     </button>
                   )}
@@ -639,8 +661,9 @@ export function KellnerClient() {
         <ZahlModal
           nummer={zahlFuer.nummer}
           summeCent={zahlFuer.summeCent}
-          laedt={zahlLaedt}
-          fehler={zahlFehler}
+          positionen={zahlFuer.positionen}
+          laedt={false}
+          fehler={null}
           sumupAffiliateKey={sumupKey}
           onAbbrechen={() => setZahlFuer(null)}
           onBezahlen={bezahlen}
@@ -654,7 +677,7 @@ export function KellnerClient() {
           summeCent={summe}
           positionen={positionen.map((p) => ({ produktName: p.name, menge: p.menge, einzelpreisCent: p.preisCent, summeCent: p.preisCent * p.menge }))}
           laedt={false}
-          fehler={direktFehler}
+          fehler={null}
           sumupAffiliateKey={sumupKey}
           onAbbrechen={() => setDirektOffen(false)}
           onBezahlen={bezahlenDirekt}
@@ -666,9 +689,9 @@ export function KellnerClient() {
           beleg={beleg}
           laedt={abschlussLaedt}
           fehler={abschlussFehler}
-          onKorrigieren={direktKorrigieren}
-          onFertig={() => direktAbschliessen(false)}
-          onDrucken={() => direktAbschliessen(true)}
+          onKorrigieren={belegKorrigieren}
+          onFertig={() => belegAbschliessen(false)}
+          onDrucken={() => belegAbschliessen(true)}
         />
       )}
     </div>

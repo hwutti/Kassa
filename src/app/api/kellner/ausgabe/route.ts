@@ -21,7 +21,7 @@ export async function GET() {
       orderBy: { createdAt: "asc" },
       include: {
         kellner: { select: { anzeigename: true, benutzername: true } },
-        positionen: { select: { produktName: true, menge: true, status: true } },
+        positionen: { select: { produktName: true, menge: true, status: true, einzelpreisCent: true, summeCent: true } },
         tickets: { include: { arbeitsbereich: { select: { name: true } } } },
       },
     });

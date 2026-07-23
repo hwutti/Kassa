@@ -92,7 +92,7 @@ export function BelegUebersicht({
             </button>
           </div>
           <p className="text-[11px] text-neutral-500 text-center">
-            „Korrigieren" verwirft die Rechnung (nichts wird gebucht).
+            „Korrigieren" = zurück, es wird nichts gebucht.
           </p>
         </div>
       </div>
