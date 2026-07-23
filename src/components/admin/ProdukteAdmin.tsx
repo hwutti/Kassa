@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 import { useDialog } from "@/components/ui/DialogProvider";
 import { IconPicker } from "@/components/admin/IconPicker";
+import { Modal } from "@/components/ui/Modal";
 import { formatCent, parseEuroToCent } from "@/lib/money";
 
 type Produkt = {
@@ -312,8 +313,7 @@ function ProduktForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4">
-      <div className="card w-full max-w-lg p-4 space-y-3 max-h-[92dvh] overflow-y-auto rounded-b-none sm:rounded-2xl">
+    <Modal variant="sheet" onSchliessen={onAbbrechen} cardClass="w-full max-w-lg p-4 space-y-3 max-h-[92dvh] overflow-y-auto">
         <h2 className="text-lg font-semibold">
           {form.id ? "Produkt bearbeiten" : "Neues Produkt"}
         </h2>
@@ -511,7 +511,6 @@ function ProduktForm({
             Speichern
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 import { useDialog } from "@/components/ui/DialogProvider";
 import { IconPicker } from "@/components/admin/IconPicker";
+import { Modal } from "@/components/ui/Modal";
 
 type Bereich = {
   id: string;
@@ -218,9 +219,8 @@ export function StammEditor<T extends { name: string; beschreibung: string; icon
   extra?: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4">
-      <div className="card w-full max-w-md p-4 space-y-3 max-h-[92dvh] overflow-y-auto rounded-b-none sm:rounded-2xl">
-        <h2 className="text-lg font-semibold">{titel}</h2>
+    <Modal variant="sheet" onSchliessen={onAbbrechen} cardClass="w-full max-w-md p-4 space-y-3 max-h-[92dvh] overflow-y-auto">
+      <h2 className="text-lg font-semibold">{titel}</h2>
         <label className="block">
           <span className="text-sm text-neutral-400">Name</span>
           <input
@@ -271,7 +271,6 @@ export function StammEditor<T extends { name: string; beschreibung: string; icon
             Speichern
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
