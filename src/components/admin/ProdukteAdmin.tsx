@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 import { useDialog } from "@/components/ui/DialogProvider";
+import { IconPicker } from "@/components/admin/IconPicker";
 import { formatCent, parseEuroToCent } from "@/lib/money";
 
 type Produkt = {
@@ -317,24 +318,19 @@ function ProduktForm({
           {form.id ? "Produkt bearbeiten" : "Neues Produkt"}
         </h2>
 
-        <div className="flex gap-2">
-          <label className="block w-20">
-            <span className="text-sm text-neutral-400">Icon</span>
-            <input
-              className="input mt-1 text-center text-xl"
-              placeholder="🍺"
-              value={form.icon}
-              onChange={(e) => setForm({ ...form, icon: e.target.value })}
-            />
-          </label>
-          <label className="block flex-1">
-            <span className="text-sm text-neutral-400">Name</span>
-            <input
-              className="input mt-1"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </label>
+        <label className="block">
+          <span className="text-sm text-neutral-400">Name</span>
+          <input
+            className="input mt-1"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </label>
+        <div>
+          <span className="text-sm text-neutral-400">Icon (falls kein Bild hochgeladen ist)</span>
+          <div className="mt-1">
+            <IconPicker value={form.icon} onChange={(icon) => setForm({ ...form, icon })} />
+          </div>
         </div>
 
         <label className="block">

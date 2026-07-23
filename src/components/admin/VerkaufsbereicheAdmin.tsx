@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 import { useDialog } from "@/components/ui/DialogProvider";
+import { IconPicker } from "@/components/admin/IconPicker";
 
 type Bereich = {
   id: string;
@@ -215,24 +216,19 @@ export function StammEditor<T extends { name: string; beschreibung: string; icon
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4">
       <div className="card w-full max-w-md p-4 space-y-3 max-h-[92dvh] overflow-y-auto rounded-b-none sm:rounded-2xl">
         <h2 className="text-lg font-semibold">{titel}</h2>
-        <div className="flex gap-2">
-          <label className="block w-20">
-            <span className="text-sm text-neutral-400">Icon</span>
-            <input
-              className="input mt-1 text-center text-xl"
-              placeholder="🍺"
-              value={form.icon}
-              onChange={(e) => setForm({ ...form, icon: e.target.value })}
-            />
-          </label>
-          <label className="block flex-1">
-            <span className="text-sm text-neutral-400">Name</span>
-            <input
-              className="input mt-1"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </label>
+        <label className="block">
+          <span className="text-sm text-neutral-400">Name</span>
+          <input
+            className="input mt-1"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </label>
+        <div>
+          <span className="text-sm text-neutral-400">Icon</span>
+          <div className="mt-1">
+            <IconPicker value={form.icon} onChange={(icon) => setForm({ ...form, icon })} />
+          </div>
         </div>
         <label className="block">
           <span className="text-sm text-neutral-400">Beschreibung (optional)</span>
