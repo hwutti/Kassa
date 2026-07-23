@@ -17,10 +17,6 @@ const STATUS_INFO: Record<string, { icon: string; kopf: string }> = {
 export function statusInfo(s: string) {
   return STATUS_INFO[s] ?? STATUS_INFO.SUBMITTED;
 }
-export function minutenSeit(iso?: string | null): number | null {
-  if (!iso) return null;
-  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
-}
 
 /** Vollbreiter, farbiger Status-Kopf: Symbol + Text + Wartezeit. Auf einen Blick erkennbar. */
 export function StatusKopf({ status, minuten }: { status: string; minuten: number | null }) {
@@ -66,16 +62,16 @@ export function ZahlungBadge({ bezahlt }: { bezahlt: boolean }) {
   );
 }
 
-/** Arbeitsbereich-Fortschritt als kräftig gefüllte Pille (fertig/in Arbeit). */
+/** Arbeitsbereich-Fortschritt als kräftig gefüllte Pille: wartet / in Arbeit / fertig. */
 export function BereichChip({ name, status }: { name: string; status: string }) {
   const fertig = status === "READY" || status === "COLLECTED";
+  const inArbeit = status === "ACCEPTED" || status === "IN_PREPARATION";
+  const stil = fertig ? "bg-emerald-500 text-white" : inArbeit ? "bg-amber-500 text-black" : "bg-neutral-600 text-neutral-100";
+  const icon = fertig ? "✓" : inArbeit ? "⏳" : "•";
+  const text = fertig ? "fertig" : inArbeit ? "in Arbeit" : "wartet";
   return (
-    <span
-      className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-1 ${
-        fertig ? "bg-emerald-500 text-white" : "bg-amber-500 text-black"
-      }`}
-    >
-      {fertig ? "✓" : "⏳"} {name} {fertig ? "fertig" : "in Arbeit"}
+    <span className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-1 ${stil}`}>
+      {icon} {name} {text}
     </span>
   );
 }

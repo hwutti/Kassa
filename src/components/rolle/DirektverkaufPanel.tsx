@@ -6,16 +6,11 @@ import { formatCent } from "@/lib/money";
 import { ZahlModal } from "@/components/rolle/ZahlModal";
 import { BelegUebersicht, type Beleg } from "@/components/rolle/BelegUebersicht";
 import { druckeBon, type BonDaten } from "@/lib/bon";
+import { uuid } from "@/lib/id";
 
 type Kat = { id: string; name: string; farbe: string | null; icon: string | null };
 type Prod = { id: string; name: string; preisCent: number; icon: string | null; bildUrl: string | null; barcode: string | null; kategorieId: string };
 type Pos = { produktId: string; name: string; preisCent: number; menge: number };
-
-function uuid() {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
 
 /**
  * Direktverkauf/Tresen-Panel: Kunde bestellt direkt am Stand, bekommt alles dort

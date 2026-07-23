@@ -8,9 +8,12 @@ import { useDialog } from "@/components/ui/DialogProvider";
 import { useLive } from "@/lib/useLive";
 import { ZahlModal } from "@/components/rolle/ZahlModal";
 import { BelegUebersicht, type Beleg } from "@/components/rolle/BelegUebersicht";
-import { StatusKopf, ZahlungBadge, BereichChip, minutenSeit } from "@/components/rolle/StatusUi";
+import { StatusKopf, ZahlungBadge, BereichChip } from "@/components/rolle/StatusUi";
+import { Kpi } from "@/components/ui/Kpi";
 import { InstallButton } from "@/components/kasse/InstallButton";
 import { druckeBon, type BonDaten } from "@/lib/bon";
+import { minutenSeit } from "@/lib/zeit";
+import { uuid } from "@/lib/id";
 
 type Kat = { id: string; name: string; farbe: string | null; icon: string | null };
 type Prod = { id: string; name: string; preisCent: number; icon: string | null; bildUrl: string | null; barcode: string | null; kategorieId: string };
@@ -34,12 +37,6 @@ type MeineBestellung = {
 type BelegKontext =
   | { typ: "direkt" }
   | { typ: "zahlung"; bestellungId: string; nummer: number; tisch: string | null; verkaeufer: string | null };
-
-function uuid() {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
 
 
 export function KellnerClient() {
@@ -554,8 +551,8 @@ export function KellnerClient() {
           {/* Übersicht: Kennzahlen */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <Kpi label="Offen" wert={meine.length} />
-            <Kpi label="Abholbereit" wert={meine.filter((b) => b.auslieferungStatus === "READY_FOR_PICKUP").length} akzent />
-            <Kpi label="Zahlung offen" wert={meine.filter((b) => b.zahlungStatus !== "PAID").length} />
+            <Kpi label="Abholbereit" wert={meine.filter((b) => b.auslieferungStatus === "READY_FOR_PICKUP").length} ton="gut" />
+            <Kpi label="Zahlung offen" wert={meine.filter((b) => b.zahlungStatus !== "PAID").length} ton="warnung" />
             <Kpi label="Heute erledigt" wert={erledigtHeute} />
           </div>
 
@@ -691,15 +688,6 @@ export function KellnerClient() {
           onDrucken={() => belegAbschliessen(true)}
         />
       )}
-    </div>
-  );
-}
-
-function Kpi({ label, wert, akzent }: { label: string; wert: number; akzent?: boolean }) {
-  return (
-    <div className="card p-2 text-center">
-      <div className={`text-2xl font-bold tabular-nums ${akzent && wert > 0 ? "text-brand-50" : ""}`}>{wert}</div>
-      <div className="text-xs text-neutral-400">{label}</div>
     </div>
   );
 }

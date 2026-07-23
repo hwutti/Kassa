@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 import { formatCent } from "@/lib/money";
 import { RollenHeader } from "@/components/rolle/RollenHeader";
-import { StatusPille, ZahlungBadge } from "@/components/rolle/StatusUi";
+import { StatusPille, ZahlungBadge, BereichChip } from "@/components/rolle/StatusUi";
+import { Kpi } from "@/components/ui/Kpi";
 import { useLive } from "@/lib/useLive";
+import { minutenSeit } from "@/lib/zeit";
 
 type Bestellung = {
   id: string;
@@ -24,10 +26,6 @@ type Daten = {
   kpi: { offen: number; abholbereit: number; inArbeit: number; zahlungOffen: number };
   bestellungen: Bestellung[];
 };
-
-function min(iso: string) {
-  return Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-}
 
 export function UebersichtClient() {
   const [daten, setDaten] = useState<Daten | null>(null);
@@ -57,9 +55,9 @@ export function UebersichtClient() {
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <Kpi label="Offen" wert={daten.kpi.offen} />
-              <Kpi label="Abholbereit" wert={daten.kpi.abholbereit} gut />
+              <Kpi label="Abholbereit" wert={daten.kpi.abholbereit} ton="gut" />
               <Kpi label="In Arbeit" wert={daten.kpi.inArbeit} />
-              <Kpi label="Zahlung offen" wert={daten.kpi.zahlungOffen} warn />
+              <Kpi label="Zahlung offen" wert={daten.kpi.zahlungOffen} ton="warnung" />
             </div>
 
             <div className="card overflow-x-auto">
@@ -78,7 +76,7 @@ export function UebersichtClient() {
                 </thead>
                 <tbody>
                   {daten.bestellungen.map((b) => {
-                    const alt = min(b.createdAt);
+                    const alt = minutenSeit(b.createdAt) ?? 0;
                     return (
                       <tr key={b.id} className="border-b border-neutral-900">
                         <td className="py-2 px-3 font-semibold">{b.nummer}</td>
@@ -87,24 +85,9 @@ export function UebersichtClient() {
                         <td className="py-2 px-3">
                           <div className="flex flex-wrap gap-1">
                             {b.bereiche.length === 0 && <span className="text-neutral-500">—</span>}
-                            {b.bereiche.map((a, i) => {
-                              const fertig = a.status === "READY" || a.status === "COLLECTED";
-                              const inArbeit = a.status === "IN_PREPARATION" || a.status === "ACCEPTED";
-                              return (
-                                <span
-                                  key={i}
-                                  className={`text-xs font-medium rounded-full px-2 py-0.5 ${
-                                    fertig
-                                      ? "bg-emerald-500 text-white"
-                                      : inArbeit
-                                        ? "bg-amber-500 text-black"
-                                        : "bg-neutral-700 text-neutral-200"
-                                  }`}
-                                >
-                                  {fertig ? "✓" : inArbeit ? "⏳" : "•"} {a.name}
-                                </span>
-                              );
-                            })}
+                            {b.bereiche.map((a, i) => (
+                              <BereichChip key={i} name={a.name} status={a.status} />
+                            ))}
                           </div>
                         </td>
                         <td className="py-2 px-3">
@@ -133,15 +116,6 @@ export function UebersichtClient() {
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-function Kpi({ label, wert, gut, warn }: { label: string; wert: number; gut?: boolean; warn?: boolean }) {
-  return (
-    <div className="card p-3">
-      <div className={`text-2xl font-bold tabular-nums ${gut ? "text-brand-50" : warn && wert > 0 ? "text-amber-300" : ""}`}>{wert}</div>
-      <div className="text-xs text-neutral-400">{label}</div>
     </div>
   );
 }

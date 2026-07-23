@@ -7,8 +7,10 @@ import { RollenHeader } from "@/components/rolle/RollenHeader";
 import { InstallButton } from "@/components/kasse/InstallButton";
 import { ZahlModal } from "@/components/rolle/ZahlModal";
 import { BelegUebersicht, type Beleg } from "@/components/rolle/BelegUebersicht";
-import { StatusKopf, ZahlungBadge, BereichChip, minutenSeit } from "@/components/rolle/StatusUi";
+import { StatusKopf, ZahlungBadge, BereichChip } from "@/components/rolle/StatusUi";
+import { Kpi } from "@/components/ui/Kpi";
 import { useLive } from "@/lib/useLive";
+import { minutenSeit } from "@/lib/zeit";
 import { druckeBon } from "@/lib/bon";
 
 type Position = { produktName: string; menge: number; einzelpreisCent: number; summeCent: number; status: string };
@@ -156,9 +158,9 @@ export function KasseClient() {
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {/* Kennzahlen */}
         <div className="grid grid-cols-3 gap-2">
-          <Kpi label="Offen" wert={String(bestellungen.length)} akzent={bestellungen.length > 0} />
+          <Kpi label="Offen" wert={bestellungen.length} ton="gut" />
           <Kpi label="Summe offen" wert={formatCent(summeOffen)} />
-          <Kpi label="Heute kassiert" wert={String(heuteKassiert)} />
+          <Kpi label="Heute kassiert" wert={heuteKassiert} />
         </div>
 
         {bestellungen.length === 0 && (
@@ -222,15 +224,6 @@ export function KasseClient() {
           onDrucken={() => belegAbschliessen(true)}
         />
       )}
-    </div>
-  );
-}
-
-function Kpi({ label, wert, akzent }: { label: string; wert: string; akzent?: boolean }) {
-  return (
-    <div className="card p-2 text-center">
-      <div className={`text-xl font-bold tabular-nums ${akzent ? "text-brand-50" : ""}`}>{wert}</div>
-      <div className="text-xs text-neutral-400">{label}</div>
     </div>
   );
 }
