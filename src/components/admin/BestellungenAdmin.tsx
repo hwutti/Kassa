@@ -5,7 +5,8 @@ import { jsonFetch } from "@/lib/client";
 import { useDialog } from "@/components/ui/DialogProvider";
 import { StatusPille, ZahlungBadge } from "@/components/rolle/StatusUi";
 import { formatCent } from "@/lib/money";
-import { druckeBon, type BonDaten } from "@/lib/bon";
+import { BonVorschau } from "@/components/rolle/BonVorschau";
+import { type BonDaten } from "@/lib/bon";
 import type { VeranstaltungRef } from "@/lib/dto";
 
 type Bestellung = {
@@ -38,6 +39,7 @@ export function BestellungenAdmin() {
   const [ladt, setLadt] = useState(true);
   const [fehler, setFehler] = useState<string | null>(null);
   const [nurAktive, setNurAktive] = useState(false);
+  const [bonVorschau, setBonVorschau] = useState<BonDaten | null>(null);
   // Für den Beleg-Nachdruck (Kopf/Logo). Der Beleg selbst wird aus den
   // gespeicherten Daten neu erzeugt – kein Extra-Speicher pro Transaktion.
   const [konfig, setKonfig] = useState<{ titel: string; untertitel: string | null; logoUrl: string | null }>({
@@ -91,7 +93,7 @@ export function BestellungenAdmin() {
       gegebenCent: b.erhaltenCent,
       rueckgeldCent: b.rueckgeldCent,
     };
-    druckeBon(bon);
+    setBonVorschau(bon);
   }
 
   // Bei Filteränderung neu laden.
@@ -200,6 +202,8 @@ export function BestellungenAdmin() {
           </div>
         );
       })}
+
+      {bonVorschau && <BonVorschau daten={bonVorschau} onSchliessen={() => setBonVorschau(null)} />}
     </div>
   );
 }

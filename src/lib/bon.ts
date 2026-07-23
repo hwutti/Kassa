@@ -27,7 +27,8 @@ function escape(s: string): string {
  * normaler Drucker oder „Als PDF speichern"). Wartet vor dem Druck auf das Laden
  * des Logos, damit der Beleg vollständig ist.
  */
-export function druckeBon(d: BonDaten): void {
+/** Baut das druckfertige 80-mm-Beleg-HTML (auch für die In-App-Vorschau nutzbar). */
+export function bonHtml(d: BonDaten): string {
   const zeilen = d.positionen
     .map((p) => {
       const proStk = p.menge > 1 ? `<div class="ep">à ${formatCent(p.einzelpreisCent)}</div>` : "";
@@ -96,6 +97,12 @@ export function druckeBon(d: BonDaten): void {
   <hr class="rule dash">
   <div class="foot"><div class="thanks">Vielen Dank für Ihren Besuch!</div>${fuss}</div>
 </body></html>`;
+  return html;
+}
+
+/** Druckt den Beleg über ein verstecktes iframe (öffnet den System-Druckdialog). */
+export function druckeBon(d: BonDaten): void {
+  const html = bonHtml(d);
 
   // Robustes Drucken: der Druck wird vom Eltern-Fenster über das onload-Event
   // ausgelöst – NICHT über ein Inline-Skript im iframe. So funktioniert der

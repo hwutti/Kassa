@@ -13,7 +13,8 @@ import { Kpi } from "@/components/ui/Kpi";
 import { ProduktGrid, type Kat, type Prod, type Korb } from "@/components/verkauf/ProduktGrid";
 import { Warenkorb } from "@/components/verkauf/Warenkorb";
 import { InstallButton } from "@/components/kasse/InstallButton";
-import { druckeBon, type BonDaten } from "@/lib/bon";
+import { BonVorschau } from "@/components/rolle/BonVorschau";
+import { type BonDaten } from "@/lib/bon";
 import { minutenSeit } from "@/lib/zeit";
 import { uuid } from "@/lib/id";
 
@@ -75,6 +76,7 @@ export function KellnerClient() {
   const [belegKontext, setBelegKontext] = useState<BelegKontext | null>(null);
   const [abschlussLaedt, setAbschlussLaedt] = useState(false);
   const [abschlussFehler, setAbschlussFehler] = useState<string | null>(null);
+  const [bonVorschau, setBonVorschau] = useState<BonDaten | null>(null);
   const [konfig, setKonfig] = useState<{ titel: string; untertitel: string | null; logoUrl: string | null }>({
     titel: "Kirchtag",
     untertitel: null,
@@ -294,7 +296,7 @@ export function KellnerClient() {
         );
         const best = res.bestellung;
         if (macheBon) {
-          druckeBon({
+          setBonVorschau({
             titel: konfig.titel,
             untertitel: konfig.untertitel,
             logoUrl: konfig.logoUrl,
@@ -316,7 +318,7 @@ export function KellnerClient() {
           body: JSON.stringify({ gegebenCent: beleg.gegebenCent, art: beleg.art }),
         });
         if (macheBon) {
-          druckeBon({
+          setBonVorschau({
             titel: konfig.titel,
             untertitel: konfig.untertitel,
             logoUrl: konfig.logoUrl,
@@ -583,6 +585,8 @@ export function KellnerClient() {
           onDrucken={() => belegAbschliessen(true)}
         />
       )}
+
+      {bonVorschau && <BonVorschau daten={bonVorschau} onSchliessen={() => setBonVorschau(null)} />}
     </div>
   );
 }

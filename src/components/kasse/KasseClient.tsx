@@ -8,10 +8,11 @@ import { InstallButton } from "@/components/kasse/InstallButton";
 import { ZahlModal } from "@/components/rolle/ZahlModal";
 import { BelegUebersicht, type Beleg } from "@/components/rolle/BelegUebersicht";
 import { StatusKopf, ZahlungBadge, BereichChip } from "@/components/rolle/StatusUi";
+import { BonVorschau } from "@/components/rolle/BonVorschau";
 import { Kpi } from "@/components/ui/Kpi";
 import { useLive } from "@/lib/useLive";
 import { minutenSeit } from "@/lib/zeit";
-import { druckeBon } from "@/lib/bon";
+import type { BonDaten } from "@/lib/bon";
 
 type Position = { produktName: string; menge: number; einzelpreisCent: number; summeCent: number; status: string };
 type OffeneBestellung = {
@@ -50,6 +51,7 @@ export function KasseClient() {
   const [kontext, setKontext] = useState<{ bestellungId: string; nummer: number; tisch: string | null; verkaeufer: string | null } | null>(null);
   const [abschlussLaedt, setAbschlussLaedt] = useState(false);
   const [abschlussFehler, setAbschlussFehler] = useState<string | null>(null);
+  const [bonVorschau, setBonVorschau] = useState<BonDaten | null>(null);
 
   const laden = useCallback(async () => {
     try {
@@ -120,7 +122,7 @@ export function KasseClient() {
         body: JSON.stringify({ gegebenCent: beleg.gegebenCent, art: beleg.art }),
       });
       if (drucken || bonAutoDruck) {
-        druckeBon({
+        setBonVorschau({
           titel,
           untertitel,
           logoUrl,
@@ -224,6 +226,8 @@ export function KasseClient() {
           onDrucken={() => belegAbschliessen(true)}
         />
       )}
+
+      {bonVorschau && <BonVorschau daten={bonVorschau} onSchliessen={() => setBonVorschau(null)} />}
     </div>
   );
 }

@@ -8,7 +8,8 @@ import { ZahlModal } from "@/components/rolle/ZahlModal";
 import { BelegUebersicht, type Beleg } from "@/components/rolle/BelegUebersicht";
 import { ProduktGrid, type Kat, type Prod, type Korb } from "@/components/verkauf/ProduktGrid";
 import { Warenkorb } from "@/components/verkauf/Warenkorb";
-import { druckeBon, type BonDaten } from "@/lib/bon";
+import { BonVorschau } from "@/components/rolle/BonVorschau";
+import { type BonDaten } from "@/lib/bon";
 import { uuid } from "@/lib/id";
 
 /**
@@ -32,6 +33,7 @@ export function DirektverkaufPanel() {
   const [beleg, setBeleg] = useState<Beleg | null>(null);
   const [abschlussLaedt, setAbschlussLaedt] = useState(false);
   const [abschlussFehler, setAbschlussFehler] = useState<string | null>(null);
+  const [bonVorschau, setBonVorschau] = useState<BonDaten | null>(null);
   const [konfig, setKonfig] = useState<{ titel: string; untertitel: string | null; logoUrl: string | null }>({
     titel: "Kirchtag",
     untertitel: null,
@@ -144,7 +146,7 @@ export function DirektverkaufPanel() {
           gegebenCent: best.erhaltenCent,
           rueckgeldCent: best.rueckgeldCent,
         };
-        druckeBon(bon);
+        setBonVorschau(bon);
       }
       clientRef.current = uuid();
       setKorb({});
@@ -212,6 +214,8 @@ export function DirektverkaufPanel() {
           onDrucken={() => abschliessen(true)}
         />
       )}
+
+      {bonVorschau && <BonVorschau daten={bonVorschau} onSchliessen={() => setBonVorschau(null)} />}
     </div>
   );
 }

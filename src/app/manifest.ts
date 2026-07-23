@@ -48,7 +48,9 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     description: "Touch-Kassensystem für Verkaufsbereiche, Kategorien und Produkte.",
     start_url: "/",
     scope: "/",
-    display: "standalone",
+    // Vollbild ohne System-Statusleiste (Kassen-Tablet); Fallback standalone.
+    display: "fullscreen",
+    display_override: ["fullscreen", "standalone"],
     orientation: "any",
     background_color: "#0a0a0a",
     theme_color: "#0a0a0a",
