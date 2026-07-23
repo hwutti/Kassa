@@ -26,6 +26,7 @@ type MeineBestellung = {
   bestellStatus: string;
   zahlungStatus: string;
   auslieferungStatus: string;
+  createdAt?: string;
   bereiche: { name: string; status: string }[];
   positionen: { produktName: string; menge: number; einzelpreisCent: number; summeCent: number }[];
 };
@@ -40,26 +41,42 @@ function uuid() {
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-// Kräftige, gut unterscheidbare Farben je Bestellstatus (linker Rand + Pille).
-const STATUS_STIL: Record<string, { pille: string; rand: string }> = {
-  SUBMITTED: { pille: "bg-slate-500/30 text-slate-50 ring-1 ring-slate-400/50", rand: "border-slate-500" },
-  IN_PROGRESS: { pille: "bg-blue-500/30 text-blue-50 ring-1 ring-blue-400/50", rand: "border-blue-500" },
-  READY_FOR_PICKUP: { pille: "bg-emerald-500/30 text-emerald-50 ring-1 ring-emerald-400/60", rand: "border-emerald-500" },
-  COLLECTED: { pille: "bg-indigo-500/30 text-indigo-50 ring-1 ring-indigo-400/50", rand: "border-indigo-500" },
-  DELIVERED: { pille: "bg-teal-500/30 text-teal-50 ring-1 ring-teal-400/50", rand: "border-teal-500" },
-  COMPLETED: { pille: "bg-emerald-600/40 text-emerald-50 ring-1 ring-emerald-400/60", rand: "border-emerald-600" },
-  CANCELLED: { pille: "bg-red-500/30 text-red-50 ring-1 ring-red-400/50", rand: "border-red-500" },
+// Voll deckende, gut unterscheidbare Statusfarben für den Kopfbalken jeder Karte
+// (POS-Standard: auffälliger Farbbalken oben + Symbol + Text, nicht nur Rand).
+const STATUS_INFO: Record<string, { icon: string; kopf: string }> = {
+  SUBMITTED: { icon: "📤", kopf: "bg-slate-600 text-white" },
+  IN_PROGRESS: { icon: "⏳", kopf: "bg-blue-600 text-white" },
+  READY_FOR_PICKUP: { icon: "✅", kopf: "bg-emerald-600 text-white" },
+  COLLECTED: { icon: "🛎️", kopf: "bg-indigo-600 text-white" },
+  DELIVERED: { icon: "🍽️", kopf: "bg-teal-600 text-white" },
+  COMPLETED: { icon: "✔️", kopf: "bg-emerald-700 text-white" },
+  CANCELLED: { icon: "✖️", kopf: "bg-red-600 text-white" },
 };
-function statusStil(s: string) {
-  return STATUS_STIL[s] ?? STATUS_STIL.SUBMITTED;
+function statusInfo(s: string) {
+  return STATUS_INFO[s] ?? STATUS_INFO.SUBMITTED;
+}
+function minutenSeit(iso?: string): number | null {
+  if (!iso) return null;
+  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
 }
 
-/** Große, gut sichtbare Status-Pille. */
-function StatusBadge({ status }: { status: string }) {
+/** Vollbreiter, farbiger Status-Kopf: Symbol + Text + Wartezeit. Auf einen Blick erkennbar. */
+function StatusKopf({ status, minuten }: { status: string; minuten: number | null }) {
+  const info = statusInfo(status);
+  const alt = minuten != null && minuten >= 6;
   return (
-    <span className={`text-sm font-semibold px-3 py-1 rounded-full whitespace-nowrap ${statusStil(status).pille}`}>
-      {BESTELL_STATUS_LABEL[status] ?? status}
-    </span>
+    <div className={`flex items-center justify-between gap-2 px-3 py-2 ${info.kopf}`}>
+      <span className="font-bold text-sm flex items-center gap-1.5">
+        <span className="text-base leading-none">{info.icon}</span>
+        {BESTELL_STATUS_LABEL[status] ?? status}
+      </span>
+      {minuten != null && (
+        <span className={`text-xs font-bold tabular-nums ${alt ? "bg-black/30 rounded px-1.5 py-0.5" : "opacity-90"}`}>
+          {alt ? "⏰ " : ""}
+          {minuten} min
+        </span>
+      )}
+    </div>
   );
 }
 /** Zahlungsstatus als farbige Pille. */
@@ -599,51 +616,53 @@ export function KellnerClient() {
             const ausgeliefert = b.auslieferungStatus === "DELIVERED";
             const bezahlt = b.zahlungStatus === "PAID";
             return (
-              <div key={b.id} className={`card p-3 border-l-8 ${statusStil(b.bestellStatus).rand}`}>
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="font-semibold text-base">
-                    Nr. {b.nummer}
-                    {b.tisch ? ` · Tisch ${b.tisch}` : b.abholnummer ? ` · Nr. ${b.abholnummer}` : ""}
-                    {b.gast ? ` · ${b.gast}` : ""}
-                  </span>
-                  <StatusBadge status={b.bestellStatus} />
-                </div>
-                {b.bereiche.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {b.bereiche.map((a, i) => (
-                      <span
-                        key={i}
-                        className={`text-xs rounded px-1.5 py-0.5 border ${
-                          a.status === "READY" || a.status === "COLLECTED"
-                            ? "border-emerald-500/60 text-emerald-100"
-                            : "border-blue-500/50 text-blue-200"
-                        }`}
-                      >
-                        {a.name}
-                        {a.status === "READY" || a.status === "COLLECTED" ? " ✓" : " …"}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div className="mt-2 flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold text-neutral-100 tabular-nums">{formatCent(b.summeCent)}</span>
-                  <ZahlungBadge bezahlt={bezahlt} />
-                  {ausgeliefert && (
-                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full ring-1 bg-teal-500/25 text-teal-50 ring-teal-400/50">
-                      Ausgeliefert ✓
+              <div key={b.id} className="card p-0 overflow-hidden">
+                <StatusKopf status={b.bestellStatus} minuten={minutenSeit(b.createdAt)} />
+                <div className="p-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="font-semibold text-base">
+                      Nr. {b.nummer}
+                      {b.tisch ? ` · Tisch ${b.tisch}` : b.abholnummer ? ` · Nr. ${b.abholnummer}` : ""}
+                      {b.gast ? ` · ${b.gast}` : ""}
                     </span>
+                    <ZahlungBadge bezahlt={bezahlt} />
+                  </div>
+                  {b.bereiche.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {b.bereiche.map((a, i) => (
+                        <span
+                          key={i}
+                          className={`text-xs rounded px-1.5 py-0.5 border ${
+                            a.status === "READY" || a.status === "COLLECTED"
+                              ? "border-emerald-500/60 text-emerald-100"
+                              : "border-blue-500/50 text-blue-200"
+                          }`}
+                        >
+                          {a.name}
+                          {a.status === "READY" || a.status === "COLLECTED" ? " ✓" : " …"}
+                        </span>
+                      ))}
+                    </div>
                   )}
-                  <div className="ml-auto flex gap-2">
-                    {!bezahlt && darfZahlen && (
-                      <button className="btn-ghost py-1.5 text-sm" onClick={() => setZahlFuer(b)}>
-                        Kassieren
-                      </button>
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
+                    <span className="text-base font-bold text-neutral-50 tabular-nums">{formatCent(b.summeCent)}</span>
+                    {ausgeliefert && (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full ring-1 bg-teal-500/25 text-teal-50 ring-teal-400/50">
+                        Ausgeliefert ✓
+                      </span>
                     )}
-                    {!ausgeliefert && (
-                      <button className="btn-primary py-1.5 text-sm" onClick={() => ausgeben(b)}>
-                        Ausgeben
-                      </button>
-                    )}
+                    <div className="ml-auto flex gap-2">
+                      {!bezahlt && darfZahlen && (
+                        <button className="btn-ghost py-1.5 text-sm" onClick={() => setZahlFuer(b)}>
+                          Kassieren
+                        </button>
+                      )}
+                      {!ausgeliefert && (
+                        <button className="btn-primary py-1.5 text-sm" onClick={() => ausgeben(b)}>
+                          Ausgeben
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -663,29 +682,31 @@ export function KellnerClient() {
           {ausgabe.map((b) => {
             const bezahlt = b.zahlungStatus === "PAID";
             return (
-              <div key={b.id} className="card p-3 border-l-8 border-emerald-500">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="font-semibold text-base">
-                    Nr. {b.nummer}
-                    {b.tisch ? ` · Tisch ${b.tisch}` : b.abholnummer ? ` · Nr. ${b.abholnummer}` : ""}
-                    {b.gast ? ` · ${b.gast}` : ""}
-                  </span>
-                  <StatusBadge status="READY_FOR_PICKUP" />
-                </div>
-                <div className="mt-2 flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold text-neutral-100 tabular-nums">{formatCent(b.summeCent)}</span>
-                  <ZahlungBadge bezahlt={bezahlt} />
-                  <span className="text-xs text-neutral-500">von {b.verkaeufer ?? "—"}</span>
-                </div>
-                <div className="mt-2 flex items-center gap-2 flex-wrap justify-end">
-                  {!bezahlt && darfZahlen && (
-                    <button className="btn-ghost py-1.5 text-sm" onClick={() => setZahlFuer(b)}>
-                      Kassieren
-                    </button>
-                  )}
-                  <button className="btn-primary py-1.5 text-sm" onClick={() => ausgeben(b)}>
-                    Ausgeben
-                  </button>
+              <div key={b.id} className="card p-0 overflow-hidden">
+                <StatusKopf status="READY_FOR_PICKUP" minuten={minutenSeit(b.createdAt)} />
+                <div className="p-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="font-semibold text-base">
+                      Nr. {b.nummer}
+                      {b.tisch ? ` · Tisch ${b.tisch}` : b.abholnummer ? ` · Nr. ${b.abholnummer}` : ""}
+                      {b.gast ? ` · ${b.gast}` : ""}
+                    </span>
+                    <ZahlungBadge bezahlt={bezahlt} />
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
+                    <span className="text-base font-bold text-neutral-50 tabular-nums">{formatCent(b.summeCent)}</span>
+                    <span className="text-xs text-neutral-500">von {b.verkaeufer ?? "—"}</span>
+                    <div className="ml-auto flex gap-2">
+                      {!bezahlt && darfZahlen && (
+                        <button className="btn-ghost py-1.5 text-sm" onClick={() => setZahlFuer(b)}>
+                          Kassieren
+                        </button>
+                      )}
+                      <button className="btn-primary py-1.5 text-sm" onClick={() => ausgeben(b)}>
+                        Ausgeben
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             );
