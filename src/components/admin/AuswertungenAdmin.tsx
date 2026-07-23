@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 import { Kpi } from "@/components/ui/Kpi";
 import { formatCent } from "@/lib/money";
+import type { BereichRef, VeranstaltungRef } from "@/lib/dto";
 
 type NameUmsatz = { name: string; umsatzCent: number };
 type Auswertung = {
@@ -20,8 +21,8 @@ type Auswertung = {
   jeKellner: { name: string; umsatzCent: number; anzahl: number }[];
   jeProdukt: { name: string; umsatzCent: number; menge: number }[];
 };
-type Bereich = { id: string; name: string };
-type Veranstaltung = { id: string; name: string; aktiv: boolean };
+type Bereich = BereichRef;
+type Veranstaltung = VeranstaltungRef;
 
 export function AuswertungenAdmin() {
   const [daten, setDaten] = useState<Auswertung | null>(null);

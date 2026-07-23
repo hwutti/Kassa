@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 import { formatCent } from "@/lib/money";
+import type { BereichRef } from "@/lib/dto";
 
 type Produkt = {
   id: string;
@@ -14,7 +15,7 @@ type Produkt = {
   kategorie: { id: string; name: string };
   verkaufsbereichIds: string[];
 };
-type Bereich = { id: string; name: string };
+type Bereich = BereichRef;
 
 export function PreisuebersichtAdmin() {
   const [produkte, setProdukte] = useState<Produkt[]>([]);

@@ -5,6 +5,19 @@ export type VerkaufsbereichDTO = {
   name: string;
 };
 
+/** Schlanke Referenz auf einen Arbeits-/Verkaufsbereich (nur id + Name). */
+export type BereichRef = {
+  id: string;
+  name: string;
+};
+
+/** Veranstaltung mit Aktiv-Kennzeichnung (für Filter/Listen). */
+export type VeranstaltungRef = {
+  id: string;
+  name: string;
+  aktiv: boolean;
+};
+
 export type ProduktDTO = {
   id: string;
   name: string;

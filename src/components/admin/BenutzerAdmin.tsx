@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { jsonFetch } from "@/lib/client";
 import { useDialog } from "@/components/ui/DialogProvider";
 import { ROLLEN, ROLLEN_LABEL, type Rolle } from "@/lib/rollen";
+import type { BereichRef } from "@/lib/dto";
 
 type Benutzer = {
   id: string;
@@ -16,7 +17,7 @@ type Benutzer = {
   letzterLogin: string | null;
   arbeitsbereichIds: string[];
 };
-type Bereich = { id: string; name: string };
+type Bereich = BereichRef;
 type Form = {
   id?: string;
   benutzername: string;

@@ -6,6 +6,7 @@ import { useDialog } from "@/components/ui/DialogProvider";
 import { StatusPille, ZahlungBadge } from "@/components/rolle/StatusUi";
 import { formatCent } from "@/lib/money";
 import { druckeBon, type BonDaten } from "@/lib/bon";
+import type { VeranstaltungRef } from "@/lib/dto";
 
 type Bestellung = {
   id: string;
@@ -27,7 +28,7 @@ type Bestellung = {
   veranstaltungName: string | null;
   positionen: { produktName: string; menge: number; einzelpreisCent: number; summeCent: number }[];
 };
-type Veranstaltung = { id: string; name: string; aktiv: boolean };
+type Veranstaltung = VeranstaltungRef;
 
 export function BestellungenAdmin() {
   const dialog = useDialog();
