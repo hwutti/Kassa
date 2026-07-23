@@ -92,9 +92,10 @@ export function ArbeitsbereicheAdmin() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-neutral-400">
-        Arbeitsbereiche sind die Ausgabe-/Zubereitungsstellen (Küche, Bierausgabe …), an die Bestellpositionen
-        zur Bearbeitung geroutet werden. Die Produkt-Zuordnung erfolgt unter „Produkte".
+      <p className="text-sm text-neutral-400 rounded-lg border border-neutral-800 bg-neutral-900/50 px-3 py-2">
+        <b className="text-neutral-200">Station / Ausgabe</b> – <b>WO</b> ein Produkt zubereitet und geholt wird
+        (z. B. Bierausgabe, Küche, Kaffee). Steuert die <b>Tickets</b>, die zugewiesenen <b>Mitarbeiter</b> und den
+        <b> Drucker</b> der Station. Welche Produkte dazugehören, stellst du unter „Produkte" ein.
       </p>
       <button className="btn-primary" onClick={() => setForm({ ...LEER, sortierung: liste.length + 1 })}>
         + Neuer Arbeitsbereich

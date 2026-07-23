@@ -628,20 +628,20 @@ export function KellnerClient() {
                     <ZahlungBadge bezahlt={bezahlt} />
                   </div>
                   {b.bereiche.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {b.bereiche.map((a, i) => (
-                        <span
-                          key={i}
-                          className={`text-xs rounded px-1.5 py-0.5 border ${
-                            a.status === "READY" || a.status === "COLLECTED"
-                              ? "border-emerald-500/60 text-emerald-100"
-                              : "border-blue-500/50 text-blue-200"
-                          }`}
-                        >
-                          {a.name}
-                          {a.status === "READY" || a.status === "COLLECTED" ? " ✓" : " …"}
-                        </span>
-                      ))}
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {b.bereiche.map((a, i) => {
+                        const fertig = a.status === "READY" || a.status === "COLLECTED";
+                        return (
+                          <span
+                            key={i}
+                            className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-1 ${
+                              fertig ? "bg-emerald-500 text-white" : "bg-amber-500 text-black"
+                            }`}
+                          >
+                            {fertig ? "✓" : "⏳"} {a.name} {fertig ? "fertig" : "in Arbeit"}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
                   <div className="mt-2 flex items-center gap-2 flex-wrap">

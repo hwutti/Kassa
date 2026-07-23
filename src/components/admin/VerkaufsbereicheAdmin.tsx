@@ -119,6 +119,11 @@ export function VerkaufsbereicheAdmin() {
 
   return (
     <div className="space-y-4">
+      <p className="text-sm text-neutral-400 rounded-lg border border-neutral-800 bg-neutral-900/50 px-3 py-2">
+        <b className="text-neutral-200">Verkaufsstelle / Kasse</b> – <b>WO</b> verkauft und kassiert wird. Legt fest,
+        welche <b>Produkte</b> eine Kasse anbietet. Die <b>„Allgemeine Kassa"</b> zeigt automatisch alle Produkte –
+        für die meisten Feste reicht diese eine.
+      </p>
       <button className="btn-primary" onClick={() => setForm({ ...LEER, sortierung: liste.length + 1 })}>
         + Neuer Verkaufsbereich
       </button>
